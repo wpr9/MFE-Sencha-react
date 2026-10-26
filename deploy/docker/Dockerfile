@@ -17,7 +17,7 @@ RUN npx nx run-many -t build -p shell portfolio trading compliance blotter bff -
 
 # ---------------------------------------------------------------- static base
 # Unprivileged nginx: the master process runs as `nginx` (uid 101), not root.
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS static-base
+FROM nginxinc/nginx-unprivileged:1.31-alpine AS static-base
 USER root
 RUN rm -f /etc/nginx/conf.d/default.conf
 COPY deploy/docker/nginx/security-headers.conf /etc/nginx/snippets/security-headers.conf
