@@ -49,7 +49,8 @@ function DayRange({ quote }: { readonly quote: Quote | undefined }) {
   const f = useFormatters();
   if (!quote) return null;
   const span = quote.dayHigh - quote.dayLow || 1;
-  const position = ((quote.last - quote.dayLow) / span) * 100;
+  // Clamped: the simulator can print a last outside the day's range for a tick.
+  const position = Math.min(100, Math.max(0, ((quote.last - quote.dayLow) / span) * 100));
   return (
     <Tooltip title={`Low ${f.price(quote.dayLow)} · High ${f.price(quote.dayHigh)}`}>
       <Box
@@ -60,6 +61,7 @@ function DayRange({ quote }: { readonly quote: Quote | undefined }) {
           bgcolor: scheme.surfaceContainerHigh,
           position: 'relative',
         }}
+        role="img"
         aria-label="Position in day range"
       >
         <Box

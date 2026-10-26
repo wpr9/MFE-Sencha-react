@@ -6,3 +6,11 @@ coverage
 tmp
 .git
 *.log
+# Never part of an image: local secrets, CI, documentation and session scratch files.
+.env
+.env.*
+.github
+docs
+README.md
+CLAUDE.md
+scratchpad

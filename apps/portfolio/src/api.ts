@@ -35,7 +35,8 @@ export function usePortfolio(portfolioId: string) {
     queryKey: portfolioKeys.detail(portfolioId),
     queryFn: ({ signal }) =>
       http.get(apiPaths.portfolio(portfolioId), { signal, parser: PortfolioDetailSchema }),
-    refetchInterval: 30_000,
+    // A 403/404 does not change by polling; server push covers everything else.
+    refetchInterval: (query) => (query.state.status === 'error' ? false : 30_000),
   });
 }
 

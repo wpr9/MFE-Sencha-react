@@ -59,16 +59,18 @@ Ext.define('Blotter.view.widget.RecentOrdersController', {
 
   applyProps: function (props) {
     var limit = Number(props && props.limit);
-    this.limit = limit > 0 ? Math.min(Math.round(limit), MAX_LIMIT) : DEFAULT_LIMIT;
+    this.limit = limit > 0 ? Math.min(Math.max(1, Math.round(limit)), MAX_LIMIT) : DEFAULT_LIMIT;
     this.interaction = props && props.interaction === 'focus' ? 'focus' : 'open';
   },
 
   /** New props from the shell (RemoteInstance.update): applied in place, no remount. */
   onHostPropsChange: function (props) {
     var previousLimit = this.limit;
+    var previousSymbol = this.symbol;
     this.applyProps(props);
     if (this.interaction !== 'focus') this.symbol = null;
-    if (this.limit !== previousLimit) this.reload();
+    // Either change alters the server-side query: a cleared focus must not leave filtered rows.
+    if (this.limit !== previousLimit || this.symbol !== previousSymbol) this.reload();
     else this.updateFocusBar();
   },
 
@@ -185,6 +187,9 @@ Ext.define('Blotter.view.widget.RecentOrders', {
     proxy: { type: 'meridian', path: '/orders' },
     sorters: [{ property: 'createdAt', direction: 'DESC' }],
     autoLoad: false,
+    // Inline store configs are not destroyed with the grid unless asked: without this the
+    // proxy outlives the widget and an in-flight load is never aborted.
+    autoDestroy: true,
   },
 
   dockedItems: [

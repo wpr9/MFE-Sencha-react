@@ -145,7 +145,8 @@ export function HoldingsTab({
                       portfolioId: portfolio.id,
                       symbol: row.symbol,
                       side: 'SELL',
-                      quantity: Math.round(row.quantity * SELL_PREFILL_FRACTION),
+                      // At least one share: the intent schema (and the BFF) reject zero.
+                      quantity: Math.max(1, Math.round(row.quantity * SELL_PREFILL_FRACTION)),
                     })
                   }
                 >

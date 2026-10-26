@@ -58,7 +58,7 @@ export async function buildApp(config: Config): Promise<FastifyInstance> {
   );
   app.decorate(
     'domain',
-    createDomain({ seed: config.SIMULATION_SEED, tickMs: config.MARKET_TICK_MS }),
+    createDomain({ seed: config.SIMULATION_SEED, tickMs: config.MARKET_TICK_MS, log: app.log }),
   );
   app.decorateRequest('session', null);
   app.decorateRequest('traceId', '');

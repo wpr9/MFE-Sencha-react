@@ -84,8 +84,11 @@ export function TrendText({
   sx,
 }: TrendTextProps) {
   const { scheme } = useTheme().meridian;
+  // NaN and ±Infinity are "no direction", never a decline.
   const direction =
-    value === null || value === undefined || Math.abs(value) < 1e-9 ? 0 : Math.sign(value);
+    value === null || value === undefined || !Number.isFinite(value) || Math.abs(value) < 1e-9
+      ? 0
+      : Math.sign(value);
   const good = direction === 0 ? null : direction > 0 === upIsGood;
   const color = good === null ? scheme.onSurfaceVariant : good ? scheme.positive : scheme.negative;
   const Icon =
@@ -165,7 +168,8 @@ export function StatTile({
         ) : (
           delta !== undefined && (
             <>
-              <TrendText value={deltaValue} upIsGood={upIsGood}>
+              {/* No direction, no arrow: a plain ratio ("4.2% of NAV") must not read as a decline. */}
+              <TrendText value={deltaValue} upIsGood={upIsGood} showIcon={deltaValue != null}>
                 {delta}
               </TrendText>
               {deltaLabel && (

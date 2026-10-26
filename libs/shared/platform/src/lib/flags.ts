@@ -1,18 +1,24 @@
 import type { FeatureFlagsApi } from '@meridian/contracts';
+import { z } from 'zod';
 
 export interface FeatureFlags extends FeatureFlagsApi {
   /** Local override for QA/demo; `null` removes it. Disabled in production. */
   setOverride(flag: string, value: boolean | null): void;
   getOverrides(): Readonly<Record<string, boolean>>;
+  /** Server flags travel with the session document; a renewal may change them. */
+  setServerFlags(flags: Readonly<Record<string, boolean>>): void;
   subscribe(listener: () => void): () => void;
 }
 
 const STORAGE_KEY = 'meridian.flag-overrides.v1';
+/** Anything else found in storage (an older build, a hand edit) is ignored, not trusted. */
+const OverridesSchema = z.record(z.string(), z.boolean());
 
 function readOverrides(): Record<string, boolean> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+    const parsed = OverridesSchema.safeParse(raw ? JSON.parse(raw) : {});
+    return parsed.success ? parsed.data : {};
   } catch {
     return {};
   }
@@ -27,9 +33,17 @@ export function createFeatureFlags(
   serverFlags: Readonly<Record<string, boolean>>,
   allowOverrides: boolean,
 ): FeatureFlags {
-  let overrides = allowOverrides ? readOverrides() : {};
-  let effective = { ...serverFlags, ...overrides };
+  let server = serverFlags;
+  let overrides: Readonly<Record<string, boolean>> = Object.freeze(
+    allowOverrides ? readOverrides() : {},
+  );
+  // Frozen: remotes read flags; they never flip them for everyone else.
+  let effective: Readonly<Record<string, boolean>> = Object.freeze({ ...server, ...overrides });
   const listeners = new Set<() => void>();
+  const recompute = () => {
+    effective = Object.freeze({ ...server, ...overrides });
+    for (const listener of [...listeners]) listener();
+  };
 
   return {
     isEnabled: (flag) => effective[flag] === true,
@@ -40,14 +54,17 @@ export function createFeatureFlags(
       const next = { ...overrides };
       if (value === null) delete next[flag];
       else next[flag] = value;
-      overrides = next;
-      effective = { ...serverFlags, ...overrides };
+      overrides = Object.freeze(next);
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(overrides));
       } catch {
         // best-effort
       }
-      for (const listener of [...listeners]) listener();
+      recompute();
+    },
+    setServerFlags(flags) {
+      server = flags;
+      recompute();
     },
     subscribe(listener) {
       listeners.add(listener);

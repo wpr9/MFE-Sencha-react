@@ -46,7 +46,7 @@ export function useLiveHoldings(portfolio: PortfolioDetail | undefined): LiveVal
       ...holding,
       livePrice: price,
       liveValue: value,
-      liveWeight: (value / nav) * 100,
+      liveWeight: nav ? (value / nav) * 100 : 0, // an empty book has no weights, not NaN ones
       liveDayPercent: dayPercent,
       livePnl: value - holding.quantity * holding.averageCost,
     }));

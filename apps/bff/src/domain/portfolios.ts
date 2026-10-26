@@ -265,8 +265,11 @@ export class PortfolioBook {
       position.averageCost = round(cost / position.quantity, 4);
       state.cash -= price * quantity;
     } else {
-      position.quantity = Math.max(0, position.quantity - quantity);
-      state.cash += price * quantity;
+      // Never credit cash for shares that are not there: the order book reserves open sells,
+      // and the ledger stays honest even if that guard were bypassed.
+      const sold = Math.min(quantity, position.quantity);
+      position.quantity -= sold;
+      state.cash += price * sold;
     }
     if (position.quantity === 0) state.positions.delete(symbol);
     else state.positions.set(symbol, position);

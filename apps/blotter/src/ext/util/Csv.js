@@ -1,18 +1,27 @@
 /** How long the object URL stays alive after the download starts; browsers read it synchronously. */
 var REVOKE_DELAY_MS = 1000;
 
+/**
+ * Characters that make a spreadsheet treat a cell as a formula (`=HYPERLINK(...)`),
+ * or that spreadsheets strip and re-interpret (tab, CR). Exported text starting
+ * with one is prefixed with a quote so it stays text: a display name or venue is
+ * untrusted input by the time it reaches someone's Excel.
+ */
+var FORMULA_PREFIX = /^[=+\-@\t\r]/;
+
 /** CSV export of Ext records, RFC 4180 quoting, downloaded through a transient object URL. */
 Ext.define('Blotter.util.Csv', {
   singleton: true,
 
   escape: function (value) {
-    var text =
-      value instanceof Date
-        ? value.toISOString()
-        : value === null || value === undefined
-          ? ''
-          : String(value);
-    return /[",\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+    if (value instanceof Date) return value.toISOString();
+    if (value === null || value === undefined) return '';
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    var text = String(value);
+    var neutralised = FORMULA_PREFIX.test(text) ? "'" + text : text;
+    return /[",\r\n]/.test(neutralised) || neutralised !== text
+      ? '"' + neutralised.replace(/"/g, '""') + '"'
+      : neutralised;
   },
 
   /** Builds the CSV for `columns` (field names, used as headers) over `store`'s records. */

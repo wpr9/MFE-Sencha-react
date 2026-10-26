@@ -46,7 +46,7 @@ export function createMarketDataService(options: MarketDataOptions = {}): Market
     for (const subscription of [...subscriptions]) {
       let delivery: Map<string, Quote> | undefined;
       if (subscription.symbols === '*') {
-        delivery = batch;
+        delivery = new Map(batch); // own copy: a subscriber must not edit what the next one sees
       } else {
         for (const symbol of subscription.symbols) {
           const quote = batch.get(symbol);
@@ -89,8 +89,9 @@ export function createMarketDataService(options: MarketDataOptions = {}): Market
       for (const quote of batch) {
         const current = quotes.get(quote.symbol);
         if (current && current.timestamp > quote.timestamp) continue; // stale
-        quotes.set(quote.symbol, quote);
-        pending.set(quote.symbol, quote);
+        const shared = Object.freeze(quote); // handed to every subscriber by reference
+        quotes.set(quote.symbol, shared);
+        pending.set(quote.symbol, shared);
       }
       if (pending.size > 0 && !flushScheduled) {
         flushScheduled = true;

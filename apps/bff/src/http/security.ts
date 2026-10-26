@@ -39,9 +39,11 @@ export function registerSecurity(app: FastifyInstance, config: Config) {
         ? /^00-([0-9a-f]{32})-[0-9a-f]{16}-0[01]$/.exec(traceparent)
         : null;
     request.traceId = match?.[1] ?? randomBytes(16).toString('hex');
+    const client = request.headers['x-meridian-client'];
     request.log = request.log.child({
       traceId: request.traceId,
-      client: request.headers['x-meridian-client'],
+      // Bounded: a header is attacker-sized, a log line must not be.
+      client: typeof client === 'string' ? client.slice(0, 64) : undefined,
     });
   });
 

@@ -109,6 +109,8 @@ export function PortfolioDetailPage() {
             {canTrade && (
               <Button
                 variant="contained"
+                // Only once the portfolio is known to exist and be entitled: the URL alone proves neither.
+                disabled={!portfolio}
                 onClick={() => intent('trade.ticket.open', { portfolioId })}
               >
                 Trade
@@ -118,7 +120,8 @@ export function PortfolioDetailPage() {
         }
       >
         <Tabs
-          value={current}
+          // No selected tab (not an invalid value) when a deep link names a tab the flag hides.
+          value={current === 'risk' && !riskEnabled ? false : current}
           onChange={(_, value: TabId) =>
             navigate(value === 'overview' ? `../${portfolioId}` : `../${portfolioId}/${value}`)
           }
@@ -131,7 +134,7 @@ export function PortfolioDetailPage() {
       </PageHeader>
       <Box sx={{ p: 3 }}>
         {!portfolio ? (
-          <Stack spacing={2.5} aria-busy aria-label="Loading portfolio">
+          <Stack spacing={2.5} role="status" aria-busy aria-label="Loading portfolio">
             <Stack direction="row" spacing={3}>
               {[0, 1, 2, 3].map((i) => (
                 <Skeleton key={i} variant="rounded" height={96} sx={{ flex: 1 }} />

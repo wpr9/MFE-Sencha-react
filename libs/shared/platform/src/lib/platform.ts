@@ -59,7 +59,10 @@ export interface Platform {
  * host) call this once; every remote then receives `hostFor(identity)`.
  */
 export function createPlatform(options: PlatformOptions): Platform {
-  const { env, navigation, appName, debug = false } = options;
+  const { appName, debug = false } = options;
+  // Shared by every remote and the shell: frozen before anyone can patch them for the others.
+  const env: HostEnvironment = Object.freeze({ ...options.env });
+  const navigation: NavigationApi = Object.freeze(options.navigation);
 
   const telemetry = createTelemetry({
     endpoint: `${env.apiBaseUrl}${apiPaths.telemetry()}`,
@@ -76,11 +79,19 @@ export function createPlatform(options: PlatformOptions): Platform {
   });
   const currentSession = () => session.getState().session;
 
+  const entitled = (portfolioId: string) =>
+    isPortfolioEntitled(currentSession().entitlements.portfolios, portfolioId);
   const store = createHostStore({
     storageKey: `meridian.preferences.v1.${options.session.user.id}`,
   });
-  const state = toHostStateApi(store);
+  // A persisted context the user is no longer entitled to (role change, stale storage)
+  // must not survive the reload: every remote would follow it into 403s.
+  const restored = store.getState().activePortfolioId;
+  if (restored !== null && !entitled(restored)) store.getState().setActivePortfolio(null);
+  const state = toHostStateApi(store, { isEntitled: entitled });
   const flags = createFeatureFlags(options.session.flags, env.name !== 'production');
+  // Flags travel with the session document: a renewal may change them.
+  const stopFlagSync = session.subscribe(({ session: next }) => flags.setServerFlags(next.flags));
   const flagsApi: FeatureFlagsApi = Object.freeze({
     isEnabled: flags.isEnabled,
     getAll: flags.getAll,
@@ -95,6 +106,7 @@ export function createPlatform(options: PlatformOptions): Platform {
   const intents = createIntentRegistry({
     onDispatch: (intent, source) =>
       platformTelemetry.track('intent.dispatched', { intent, source }),
+    onObserverError: (error) => platformTelemetry.error(error, { kind: 'intent-observer' }),
   });
   const notifications = createNotificationCenter();
   const marketData = createMarketDataService({
@@ -161,8 +173,7 @@ export function createPlatform(options: PlatformOptions): Platform {
       getSession: currentSession,
       getUser: () => currentSession().user,
       hasPermission: (permission) => currentSession().permissions.includes(permission),
-      canAccessPortfolio: (portfolioId) =>
-        isPortfolioEntitled(currentSession().entitlements.portfolios, portfolioId),
+      canAccessPortfolio: entitled,
       getRequestHeaders(method) {
         const headers: Record<string, string> = {
           traceparent: createTraceContext().traceparent,
@@ -233,8 +244,10 @@ export function createPlatform(options: PlatformOptions): Platform {
     },
     dispose() {
       stopStreamOnSessionEnd();
+      stopFlagSync();
       realtime.stop();
       session.dispose();
+      store.dispose();
       telemetry.dispose();
       if (typeof window !== 'undefined') {
         window.removeEventListener('error', onWindowError);

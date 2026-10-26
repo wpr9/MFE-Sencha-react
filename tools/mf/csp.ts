@@ -13,6 +13,9 @@
  *   and `'strict-dynamic'` are present; they only keep legacy browsers working.
  * - Styles, fonts and images still come from the remotes' origins; inline
  *   styles are needed by Emotion (MUI) and by Ext JS.
+ * - `default-src 'self'` closes every directive not listed (frames, workers,
+ *   media, manifests). Trusted Types is deliberately absent: Ext JS writes
+ *   `innerHTML` throughout (docs/security-architecture-review.md, roadmap).
  *
  * Production (deploy/docker/nginx/shell.conf.template) mirrors this policy
  * with a fresh nonce per response.
@@ -25,6 +28,7 @@ export function strictCsp(options: {
 }): string {
   const remotes = options.remoteOrigins.join(' ');
   return [
+    "default-src 'self'",
     `script-src 'nonce-${options.nonce}' 'strict-dynamic' 'unsafe-eval' https: 'unsafe-inline'`,
     "object-src 'none'",
     "base-uri 'none'",

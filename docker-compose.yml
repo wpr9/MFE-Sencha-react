@@ -18,6 +18,7 @@ services:
     environment:
       PUBLIC_ORIGINS: http://localhost:8080
       COOKIE_SECURE: 'false' # 'true' behind TLS (switches to __Host- cookies)
+      TRUST_PROXY_HOPS: '1' # the shell's nginx appends the client address to X-Forwarded-For
       LOG_LEVEL: info
     restart: unless-stopped
 

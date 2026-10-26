@@ -35,6 +35,11 @@ export class EventHub {
     for (const listener of this.listeners) listener(entry);
   }
 
+  /** Drops the replay buffer; sequence numbers keep increasing. Used once, after seeding. */
+  reset(): void {
+    this.buffer.length = 0;
+  }
+
   replaySince(lastId: number): HubEntry[] {
     return this.buffer.filter((entry) => entry.id !== null && entry.id > lastId);
   }

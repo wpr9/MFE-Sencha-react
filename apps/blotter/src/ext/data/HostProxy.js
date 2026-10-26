@@ -27,6 +27,9 @@ Ext.define('Blotter.data.HostProxy', {
 
   doRequest: function (operation) {
     var me = this;
+    // Reads only: writes go through explicit `host.http.post` calls with their own
+    // validation and messaging, never through a store sync that would silently GET.
+    if (operation.getAction() !== 'read') throw new Error('HostProxy is read-only');
     var request = me.buildRequest(operation);
     var host = me.getHost();
     var path = me.getPath();

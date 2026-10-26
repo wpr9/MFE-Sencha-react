@@ -7,6 +7,7 @@ import {
   PerformanceRangeSchema,
   TelemetryBatchSchema,
   apiPaths,
+  type Order,
   type PortfolioDetail,
   type PortfolioSummary,
 } from '@meridian/contracts';
@@ -22,9 +23,9 @@ import {
   sessionOf,
 } from '../auth/guards';
 import type { ServerSession } from '../auth/session-store';
-import { notFound } from '../domain/errors';
+import { notFound, validation } from '../domain/errors';
 import { toSummary } from '../domain/portfolios';
-import { SECURITIES, toSecurity } from '../domain/securities';
+import { SECURITIES, getSecurity, toSecurity } from '../domain/securities';
 
 const API = '/api';
 
@@ -80,6 +81,8 @@ export async function apiRoutes(app: FastifyInstance) {
   const portfolioFor = (session: ServerSession, id: string): PortfolioDetail => {
     const detail = book.detail(id);
     if (!detail) throw notFound(`Portfolio ${id}`);
+    // 404 before 403 on purpose: portfolio ids are a fixed, public set, so existence is
+    // not a secret, and the 403 only echoes the id the caller sent.
     assertPortfolioAccess(session, id);
     const { status, openAlerts } = compliance.portfolioStatus(id, detail);
     return withComplianceVisibility(session, {
@@ -87,6 +90,17 @@ export async function apiRoutes(app: FastifyInstance) {
       complianceStatus: status,
       openAlerts,
     });
+  };
+
+  /**
+   * An order the caller may see. Entitlement failures answer 404, exactly like a
+   * missing order: ids are sequential, so a 403 naming the portfolio would let a
+   * user enumerate other desks' order flow one id at a time.
+   */
+  const orderFor = (session: ServerSession, id: string): Order => {
+    const order = orders.get(id);
+    if (!canAccessPortfolio(session, order.portfolioId)) throw notFound(`Order ${id}`);
+    return order;
   };
 
   /* ---------------------------------------------------------- Portfolios */
@@ -116,7 +130,7 @@ export async function apiRoutes(app: FastifyInstance) {
       const { id } = request.params;
       if (!book.exists(id)) throw notFound(`Portfolio ${id}`);
       assertPortfolioAccess(sessionOf(request), id);
-      const range = PerformanceRangeSchema.catch('1Y').parse(request.query.range);
+      const range = PerformanceRangeSchema.parse(request.query.range ?? '1Y'); // 422 on garbage
       return book.performance(id, range);
     },
   );
@@ -186,11 +200,7 @@ export async function apiRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>(
     `${API}/orders/:id`,
     { preHandler: requirePermission(Permission.OrderRead) },
-    async (request) => {
-      const order = orders.get(request.params.id);
-      assertPortfolioAccess(sessionOf(request), order.portfolioId);
-      return order;
-    },
+    async (request) => orderFor(sessionOf(request), request.params.id),
   );
 
   app.post(
@@ -212,8 +222,7 @@ export async function apiRoutes(app: FastifyInstance) {
     async (request) => {
       const session = sessionOf(request);
       const { comment } = OrderActionSchema.parse(request.body ?? {});
-      const order = orders.get(request.params.id);
-      assertPortfolioAccess(session, order.portfolioId);
+      const order = orderFor(session, request.params.id);
       return orders.approve(order.id, actor(session), comment ?? 'Approved.');
     },
   );
@@ -224,8 +233,7 @@ export async function apiRoutes(app: FastifyInstance) {
     async (request) => {
       const session = sessionOf(request);
       const { comment } = OrderActionSchema.parse(request.body ?? {});
-      const order = orders.get(request.params.id);
-      assertPortfolioAccess(session, order.portfolioId);
+      const order = orderFor(session, request.params.id);
       return orders.reject(order.id, actor(session), comment ?? 'Rejected.');
     },
   );
@@ -235,8 +243,7 @@ export async function apiRoutes(app: FastifyInstance) {
     { preHandler: requirePermission(Permission.OrderRoute) },
     async (request) => {
       const session = sessionOf(request);
-      const order = orders.get(request.params.id);
-      assertPortfolioAccess(session, order.portfolioId);
+      const order = orderFor(session, request.params.id);
       return orders.route(order.id, actor(session));
     },
   );
@@ -246,8 +253,7 @@ export async function apiRoutes(app: FastifyInstance) {
     { preHandler: requirePermission(Permission.OrderCancel) },
     async (request) => {
       const session = sessionOf(request);
-      const order = orders.get(request.params.id);
-      assertPortfolioAccess(session, order.portfolioId);
+      const order = orderFor(session, request.params.id);
       // Traders may cancel any working order; portfolio managers only their own.
       const canCancelAny = hasPermission(session, Permission.OrderRoute);
       return orders.cancel(order.id, actor(session), canCancelAny);
@@ -261,7 +267,14 @@ export async function apiRoutes(app: FastifyInstance) {
     { preHandler: requirePermission(Permission.OrderCreate) },
     async (request) => {
       const draft = OrderDraftSchema.parse(request.body);
+      if (!book.exists(draft.portfolioId)) throw notFound(`Portfolio ${draft.portfolioId}`);
       assertPortfolioAccess(sessionOf(request), draft.portfolioId);
+      // The answer `POST /orders` would give: a 422, not a FAIL verdict with no rule behind it.
+      if (!getSecurity(draft.symbol)) {
+        throw validation(`Unknown security ${draft.symbol}.`, [
+          { path: 'symbol', message: 'Unknown security' },
+        ]);
+      }
       return compliance.check(draft);
     },
   );
@@ -327,8 +340,23 @@ export async function apiRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const body = TelemetryBatchSchema.parse(request.body);
       for (const record of body.records) {
-        if (record.kind === 'error') request.log.warn({ telemetry: record }, 'client error');
-        else if (record.kind === 'vital')
+        // Errors are logged as a bounded projection: a client may send 50 records per beacon
+        // and 120 beacons a minute, and a log line must never be attacker-sized.
+        if (record.kind === 'error') {
+          const { error } = record;
+          request.log.warn(
+            {
+              source: record.source,
+              path: record.path,
+              error: error && {
+                name: error.name,
+                message: error.message,
+                stack: error.stack?.slice(0, 1_024),
+              },
+            },
+            'client error',
+          );
+        } else if (record.kind === 'vital')
           request.log.info(
             { vital: record.name, value: record.value, source: record.source },
             'web vital',

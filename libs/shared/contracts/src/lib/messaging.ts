@@ -109,6 +109,25 @@ export interface MeridianIntentMap {
 
 export type MeridianIntent = keyof MeridianIntentMap & string;
 
+/** Identifiers as the BFF issues them (`ORD-24118`, `GEQ`, `ALT-…`). */
+const IdSchema = z.string().min(1).max(64);
+
+/**
+ * Payload schema per intent. The shell validates every dispatch with these
+ * before acting, so a malformed payload from one remote is refused at the
+ * boundary instead of becoming a broken URL or a bad request.
+ */
+export const IntentPayloadSchemas = {
+  'trade.ticket.open': TradeTicketDraftSchema,
+  'order.open': z.object({ orderId: IdSchema }),
+  'portfolio.open': z.object({
+    portfolioId: IdSchema,
+    tab: z.enum(['overview', 'holdings', 'risk']).optional(),
+  }),
+  'compliance.alert.open': z.object({ alertId: IdSchema }),
+  'security.open': z.object({ symbol: z.string().min(1).max(32) }),
+} satisfies Record<MeridianIntent, z.ZodType>;
+
 export type IntentRequest = {
   [K in MeridianIntent]: { readonly intent: K; readonly payload: MeridianIntentMap[K] };
 }[MeridianIntent];

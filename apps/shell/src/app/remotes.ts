@@ -9,7 +9,11 @@ import {
 import { loadRemote, preloadRemote, registerRemotes } from '@module-federation/enhanced/runtime';
 import { z } from 'zod';
 
-const RegistryEntrySchema = z.object({ entry: z.url(), version: z.string().optional() });
+// Only web origins can host a manifest: `javascript:` or `data:` entries are refused here.
+const RegistryEntrySchema = z.object({
+  entry: z.url({ protocol: /^https?$/ }),
+  version: z.string().optional(),
+});
 const EnvironmentSchema = z.enum(['local', 'development', 'staging', 'production']);
 const RegistryDocumentSchema = z.object({
   environment: EnvironmentSchema.optional(),
@@ -81,7 +85,7 @@ export async function loadRemoteRegistry(url = '/config/remotes.json'): Promise<
     else
       problems.push({
         remote: name,
-        error: 'Invalid entry (an absolute manifest URL is required)',
+        error: 'Invalid entry (an absolute http(s) manifest URL is required)',
       });
   }
   registry = { environment: parsed.success ? parsed.data.environment : undefined, remotes };
@@ -195,6 +199,10 @@ export function loadRemoteModule(remote: string, module: string): Promise<Remote
           `${id} requires host contract ${candidate.hostContract}; this shell provides ${HOST_CONTRACT_VERSION}`,
         );
       }
+      // The drill may have started while this load was in flight: an "offline" remote
+      // must not report itself mounted and ready.
+      if (outages.has(remote))
+        throw new RemoteLoadError(`Remote "${remote}" is unreachable (simulated outage)`);
       setStatus(id, {
         state: 'ready',
         loadMs: Math.round(performance.now() - startedAt),

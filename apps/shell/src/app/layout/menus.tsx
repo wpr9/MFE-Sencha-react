@@ -36,6 +36,7 @@ import {
   useShellHost,
   useShellIntents,
 } from '../platform-context';
+import { isInternalPath } from '../wiring';
 
 const ROLE_LABEL: Record<Role, string> = {
   [Role.PortfolioManager]: 'Portfolio manager',
@@ -172,7 +173,7 @@ export function useRunAction() {
   return (action: NotificationAction | undefined) => {
     if (!action) return;
     if (action.intent) dispatchRequest(action.intent);
-    else if (action.href) navigate(action.href);
+    else if (action.href && isInternalPath(action.href)) navigate(action.href);
   };
 }
 

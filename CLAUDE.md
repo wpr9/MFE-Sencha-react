@@ -53,10 +53,23 @@ React 19 shell + React remotes (portfolio, trading, compliance) + a **Sencha Ext
   MUI X Charts 9 area selector: `.MuiLineChart-area[data-series="<id>"]`.
 - BFF sign-in page needs `Referrer-Policy: same-origin`, otherwise browsers post `Origin: null`.
 - nginx `add_header` is not inherited into locations that define their own; include the snippet.
+- `__Host-` cookies are only cleared by a Set-Cookie carrying the attributes they were set with:
+  always `reply.clearCookie(name, cookieBase)`, never `{ path: '/' }` alone.
+- Order routes answer **404, not 403**, for orders in portfolios the caller is not entitled to
+  (`orderFor()` in `routes/api.ts`): sequential ids would otherwise be an oracle.
+- Everything the Host API hands out is deep-frozen (session, env, quotes, event payloads; `deepFreeze`
+  in `libs/shared/platform/src/lib/freeze.ts`); copy before mutating. `Blotter.data.HostProxy` is
+  read-only; writes go through `host.http.post`. `host.navigation.navigate` and intent payloads are
+  validated at the shell boundary (`isInternalPath`, `IntentPayloadSchemas`).
+- Every HTML sink in the blotter encodes (`F.encode`, `:htmlEncode`, allow-listed class suffixes), and
+  the CSV export neutralises formula prefixes; keep both when adding renderers or columns.
+- `TRUST_PROXY_HOPS` defaults to 0 (no proxy); `docker-compose.yml` sets 1 behind the nginx ingress.
 
 ## Working agreements with the user
 
 - Authentication stays **mocked** (mock IdP page in the BFF).
+- Repository: https://github.com/wpr9/MFE-Sencha-react (public, branch `main`). Commit and push only
+  when asked. No vendor names in the repo: the product it resembles is never mentioned.
 - **Follow Google's published, battle-tested practices** (strict CSP, Fetch Metadata, SRE/SLOs, SLSA,
   OWNERS) and cite them; the mapping lives in `docs/security-architecture-review.md`.
 - **Quality over quantity.** Fewer features, each verified and finished to production standard.

@@ -5,6 +5,7 @@ import type {
   MeridianIntentMap,
   Unsubscribe,
 } from '@meridian/contracts';
+import { notifyAll } from './listeners';
 
 export interface IntentContext {
   /** Remote (or `shell`) that dispatched the intent. */
@@ -48,6 +49,8 @@ export interface IntentDispatch {
 
 export interface IntentRegistryOptions {
   readonly onDispatch?: (intent: string, source: string) => void;
+  /** An observer threw. Observers are diagnostics; they must never fail a dispatch. */
+  readonly onObserverError?: (error: unknown) => void;
 }
 
 /**
@@ -58,9 +61,8 @@ export interface IntentRegistryOptions {
 export function createIntentRegistry(options: IntentRegistryOptions = {}): IntentRegistry {
   const handlers = new Map<string, IntentHandler<MeridianIntent>>();
   const observers = new Set<(dispatch: IntentDispatch) => void>();
-  const notify = (dispatch: Omit<IntentDispatch, 'timestamp'>) => {
-    for (const observer of [...observers]) observer({ ...dispatch, timestamp: Date.now() });
-  };
+  const notify = (dispatch: Omit<IntentDispatch, 'timestamp'>) =>
+    notifyAll(observers, [{ ...dispatch, timestamp: Date.now() }], options.onObserverError);
 
   const registry: IntentRegistry = {
     register(intent, handler) {

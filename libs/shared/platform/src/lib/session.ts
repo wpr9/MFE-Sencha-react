@@ -1,4 +1,5 @@
 import { SessionSchema, authPaths, type Session, type Unsubscribe } from '@meridian/contracts';
+import { deepFreeze } from './freeze';
 import { notifyAll } from './listeners';
 
 export type SessionPhase = 'active' | 'expiring' | 'expired' | 'signed-out';
@@ -93,7 +94,8 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
     onListenerError,
   } = options;
 
-  let session = options.initialSession;
+  // Frozen: `host.auth.getSession()` hands this very object to every remote.
+  let session = deepFreeze(options.initialSession);
   let phase: SessionPhase = 'active';
   // Loading the app does not extend the session server-side, so the first
   // activity after a load must be allowed to send a keep-alive.
@@ -148,11 +150,14 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
   };
 
   const applySession = (next: Session, broadcast: boolean) => {
-    session = next;
+    session = deepFreeze(next);
     trackSkew(next);
     if (broadcast)
       channel?.postMessage({ type: 'renewed', session: next } satisfies ChannelMessage);
-    if (phase === 'expiring' || phase === 'active') phase = 'active';
+    // A renewal revives an active, expiring or expired session (another tab may have
+    // re-authenticated after this one saw a 401); `evaluate` re-expires it if the new
+    // deadline has already passed. Only an explicit sign-out is final.
+    if (phase !== 'signed-out') phase = 'active';
     evaluate();
     emit();
   };
@@ -197,9 +202,14 @@ export function createSessionManager(options: SessionManagerOptions): SessionMan
   };
 
   if (channel) {
-    channel.onmessage = (event: MessageEvent<ChannelMessage>) => {
-      if (event.data.type === 'renewed') applySession(event.data.session, false);
-      if (event.data.type === 'signed-out') endSession(false);
+    channel.onmessage = (event: MessageEvent<unknown>) => {
+      // Same origin only, but another tab may run an older build: validate before adopting.
+      const data = event.data as Partial<ChannelMessage> | null;
+      if (!data || typeof data !== 'object') return;
+      if (data.type === 'renewed') {
+        const parsed = SessionSchema.safeParse(data.session);
+        if (parsed.success) applySession(parsed.data, false);
+      } else if (data.type === 'signed-out') endSession(false);
     };
   }
   if (typeof window !== 'undefined') {

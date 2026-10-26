@@ -1,0 +1,5 @@
+name: Meridian CodeQL
+# Third-party and generated code is not ours to fix; scanning it only produces noise.
+paths-ignore:
+  - apps/blotter/public/vendor
+  - '**/dist'

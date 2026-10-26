@@ -171,11 +171,11 @@ Ext.define('Blotter.view.blotter.Blotter', {
           enableGroupingMenu: false,
           startCollapsed: false,
           groupHeaderTpl: [
-            '<span class="mrd-group">{[this.label(values.groupValue)]}<span class="mrd-group__count">{rows.length}</span></span>',
+            '<span class="mrd-group">{[this.label(values.groupValue, values.groupField)]}<span class="mrd-group__count">{rows.length}</span></span>',
             {
-              // Groups are status buckets (rank-prefixed) or the order side.
-              label: function (value) {
-                var text = groupLabel(value);
+              // Groups are status buckets (rank-prefixed), the order side, or a name.
+              label: function (value, field) {
+                var text = groupLabel(value, field);
                 return Ext.String.htmlEncode(
                   text === 'BUY' ? 'Buy' : text === 'SELL' ? 'Sell' : text,
                 );

@@ -134,7 +134,7 @@ to production are in [docs/security-architecture-review.md](docs/security-archit
 
 ## Run
 
-Requires Node.js 22.13 (`.nvmrc`) and npm 10.
+Requires Node.js 22.12 or newer (`.nvmrc`) and npm 10.
 
 ```bash
 npm ci
@@ -206,7 +206,7 @@ Validated at start-up in `apps/bff/src/config.ts`; an invalid value fails fast.
 | `COOKIE_SECURE`                    | `true` behind TLS: `Secure`, `__Host-` cookies                    | `false`                                 |
 | `SESSION_IDLE_TIMEOUT_SECONDS`     | Idle timeout, extended only by user activity                      | `900`                                   |
 | `SESSION_ABSOLUTE_TIMEOUT_SECONDS` | Maximum session length                                            | `28800`                                 |
-| `TRUST_PROXY_HOPS`                 | Reverse proxies whose `X-Forwarded-For` entries are trusted       | `1`                                     |
+| `TRUST_PROXY_HOPS`                 | Reverse proxies whose `X-Forwarded-For` entries are trusted       | `0` (`1` behind the nginx ingress)      |
 | `AUTH_MODE`                        | Identity provider; `mock` is the only mode in this POC            | `mock`                                  |
 | `SIMULATION_SEED`                  | Seed of the deterministic market and portfolio simulation         | `20261024`                              |
 | `MARKET_TICK_MS`                   | Quote tick interval                                               | `1000`                                  |
