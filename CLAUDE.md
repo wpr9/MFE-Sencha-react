@@ -4,7 +4,8 @@ Micro-frontend investment workspace POC: Nx 23 monorepo, Module Federation 2 on 
 React 19 shell + React remotes (portfolio, trading, compliance) + a **Sencha Ext JS 6.2** remote
 (blotter), mock BFF on Fastify 5. Being prepared for a **production-level management review**.
 
-**Current work and progress: read [docs/STATUS.md](docs/STATUS.md) first** and keep it updated.
+Working notes on current progress are kept **outside the repository** (`docs/STATUS.md` is
+git-ignored and must never be committed).
 
 ## Commands
 

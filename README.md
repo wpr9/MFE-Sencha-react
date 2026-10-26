@@ -166,8 +166,7 @@ npm run vendor:extjs                            # re-fetch Ext JS, SRI-verified
 No end-to-end suite by design. Changes are verified by typecheck, lint and production builds for
 all projects, plus driving the running app in headless Chromium with real in-app navigation,
 reading screenshots and console errors for every persona in light and dark mode. The BFF security
-controls are re-exercised with scripted exploit attempts after each change. Current state and the
-log of findings live in [docs/STATUS.md](docs/STATUS.md).
+controls are re-exercised with scripted exploit attempts after each change.
 
 ## Repository layout
 

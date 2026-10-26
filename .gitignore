@@ -36,3 +36,6 @@ npm-debug.log*
 *.log
 vitest.config.*.timestamp*
 .vitest
+
+# Local working notes, never part of the repository
+docs/STATUS.md
