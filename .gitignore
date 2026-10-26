@@ -1,0 +1,38 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+tmp
+out-tsc
+coverage
+*.tsbuildinfo
+
+# Nx
+.nx/cache
+.nx/workspace-data
+
+# Test artifacts
+test-results
+playwright-report
+blob-report
+apps/*-e2e/.auth
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Editors / OS
+.idea
+.DS_Store
+*.swp
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Logs
+npm-debug.log*
+*.log
+vitest.config.*.timestamp*
+.vitest

@@ -1,0 +1,26 @@
+# Ownership, in the spirit of Google's OWNERS files: every path has an owning
+# team whose approval is required (enable "Require review from Code Owners" in
+# branch protection). Teams below are placeholders - map them to real GitHub teams.
+# The last matching rule wins.
+
+*                               @meridian-example/platform-team
+
+# Platform: shell, contracts and the shared runtime every remote depends on.
+/apps/shell/                    @meridian-example/platform-team
+/libs/shared/                   @meridian-example/platform-team
+/tools/                         @meridian-example/platform-team
+
+# The Host API contract is a cross-team interface: platform + architecture review.
+/libs/shared/contracts/         @meridian-example/platform-team @meridian-example/architecture
+
+# Each remote is owned and released by its product team.
+/apps/portfolio/                @meridian-example/portfolio-team
+/apps/trading/                  @meridian-example/trading-team
+/apps/compliance/               @meridian-example/compliance-team
+/apps/blotter/                  @meridian-example/oms-team
+
+# Security-sensitive surfaces need a security reviewer as well.
+/apps/bff/                      @meridian-example/platform-team @meridian-example/security
+/deploy/                        @meridian-example/platform-team @meridian-example/security
+/tools/mf/csp.ts                @meridian-example/platform-team @meridian-example/security
+/.github/                       @meridian-example/platform-team @meridian-example/security

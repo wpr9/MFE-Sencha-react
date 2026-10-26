@@ -1,0 +1,35 @@
+{
+  "name": "compliance",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/compliance/src",
+  "projectType": "application",
+  "tags": ["scope:compliance", "type:remote", "framework:react"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "options": {
+        "command": "rsbuild dev",
+        "cwd": "apps/compliance"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "command": "rsbuild build",
+        "cwd": "apps/compliance"
+      }
+    },
+    "preview": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "dependsOn": ["build"],
+      "options": {
+        "command": "rsbuild preview",
+        "cwd": "apps/compliance"
+      }
+    },
+    "typecheck": {}
+  }
+}

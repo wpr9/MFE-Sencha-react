@@ -1,0 +1,30 @@
+{
+  "name": "blotter",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/blotter/src",
+  "projectType": "application",
+  "tags": ["scope:blotter", "type:remote", "framework:extjs"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "options": { "command": "rsbuild dev", "cwd": "apps/blotter" }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": { "command": "rsbuild build", "cwd": "apps/blotter" }
+    },
+    "preview": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "dependsOn": ["build"],
+      "options": { "command": "rsbuild preview", "cwd": "apps/blotter" }
+    },
+    "vendor-extjs": {
+      "executor": "nx:run-commands",
+      "options": { "command": "node tools/scripts/vendor-extjs.mjs" }
+    },
+    "typecheck": {}
+  }
+}

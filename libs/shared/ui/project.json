@@ -1,0 +1,10 @@
+{
+  "name": "ui",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/shared/ui/src",
+  "projectType": "library",
+  "tags": ["framework:react", "scope:shared", "type:ui"],
+  "targets": {
+    "typecheck": {}
+  }
+}

@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Lint, typecheck, test, build (affected)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # Lifecycle scripts are the classic npm supply-chain vector: none run in CI
+      # (the Dockerfile installs the same way).
+      - run: npm ci --ignore-scripts
+      # Known vulnerabilities in what ships to production fail the build.
+      - run: npm audit --omit=dev --audit-level=high
+      # Formatting is a working agreement; CI makes it a check.
+      - run: npx prettier --check .
+      - uses: nrwl/nx-set-shas@v4
+      # Module-boundary rules run as part of lint: a remote importing shell
+      # internals (or the Ext JS remote importing React libs) fails the build.
+      - run: npx nx affected -t lint typecheck test build --parallel=3
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      # Blocks pull requests that add vulnerable or disallowed-licence dependencies.
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+  codeql:
+    name: CodeQL (static analysis)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: github/codeql-action/analyze@v3
+
+  images:
+    name: Container images
+    needs: verify
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        include:
+          - { target: shell, app: '' }
+          - { target: bff, app: '' }
+          - { target: remote, app: portfolio }
+          - { target: remote, app: trading }
+          - { target: remote, app: compliance }
+          - { target: remote, app: blotter }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/Dockerfile
+          target: ${{ matrix.target }}
+          build-args: APP=${{ matrix.app }}
+          push: false
+          tags: meridian/${{ matrix.app || matrix.target }}:${{ github.sha }}
+          # SLSA build provenance and an SBOM attached to every image (published on push).
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -1,0 +1,29 @@
+# Automated dependency updates: small, frequent, reviewable upgrades instead of
+# rare big-bang ones. Security updates are raised as soon as advisories appear.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      # One PR per family keeps related packages on the same version (e.g. the React singleton).
+      react:
+        patterns: ['react', 'react-dom', '@types/react', '@types/react-dom']
+      mui:
+        patterns: ['@mui/*', '@emotion/*']
+      nx:
+        patterns: ['nx', '@nx/*']
+      module-federation:
+        patterns: ['@module-federation/*', '@rsbuild/*', '@rspack/*']
+      fastify:
+        patterns: ['fastify', '@fastify/*', 'fastify-plugin']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /deploy/docker
+    schedule:
+      interval: weekly

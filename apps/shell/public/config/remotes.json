@@ -1,0 +1,10 @@
+{
+  "$comment": "Runtime remote registry for local development. Each environment ships its own copy (see deploy/). Entries point at the Module Federation 2 manifest of each independently deployed remote.",
+  "environment": "local",
+  "remotes": {
+    "portfolio": { "entry": "http://localhost:4201/mf-manifest.json" },
+    "trading": { "entry": "http://localhost:4202/mf-manifest.json" },
+    "compliance": { "entry": "http://localhost:4203/mf-manifest.json" },
+    "blotter": { "entry": "http://localhost:4204/mf-manifest.json" }
+  }
+}

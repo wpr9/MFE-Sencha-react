@@ -1,0 +1,35 @@
+{
+  "name": "trading",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/trading/src",
+  "projectType": "application",
+  "tags": ["scope:trading", "type:remote", "framework:react"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "options": {
+        "command": "rsbuild dev",
+        "cwd": "apps/trading"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "command": "rsbuild build",
+        "cwd": "apps/trading"
+      }
+    },
+    "preview": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "dependsOn": ["build"],
+      "options": {
+        "command": "rsbuild preview",
+        "cwd": "apps/trading"
+      }
+    },
+    "typecheck": {}
+  }
+}

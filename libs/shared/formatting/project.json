@@ -1,0 +1,10 @@
+{
+  "name": "formatting",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/shared/formatting/src",
+  "projectType": "library",
+  "tags": ["scope:shared", "type:util"],
+  "targets": {
+    "typecheck": {}
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "portfolio",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/portfolio/src",
+  "projectType": "application",
+  "tags": ["scope:portfolio", "type:remote", "framework:react"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "options": {
+        "command": "rsbuild dev",
+        "cwd": "apps/portfolio"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "command": "rsbuild build",
+        "cwd": "apps/portfolio"
+      }
+    },
+    "preview": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "dependsOn": ["build"],
+      "options": {
+        "command": "rsbuild preview",
+        "cwd": "apps/portfolio"
+      }
+    },
+    "typecheck": {}
+  }
+}
