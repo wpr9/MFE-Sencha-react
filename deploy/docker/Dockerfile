@@ -26,7 +26,11 @@ HEALTHCHECK --interval=15s --timeout=3s CMD wget -qO- http://127.0.0.1:8080/heal
 
 # ---------------------------------------------------------------------- shell
 FROM static-base AS shell
-# The entrypoint renders config/remotes.json at start, so the html tree belongs to nginx.
+# The entrypoint (running as nginx) renders config/remotes.json at start: the directory
+# must exist and be writable by nginx whatever the build output contains.
+USER root
+RUN mkdir -p /usr/share/nginx/html/config && chown -R nginx:nginx /usr/share/nginx/html
+USER nginx
 COPY --chown=nginx:nginx --from=build /workspace/apps/shell/dist /usr/share/nginx/html
 COPY deploy/docker/nginx/shell.conf.template /etc/nginx/templates/default.conf.template
 COPY --chmod=0755 deploy/docker/40-render-remotes.sh /docker-entrypoint.d/40-render-remotes.sh

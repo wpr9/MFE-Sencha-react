@@ -2,7 +2,7 @@ import { Box, Stack, ToggleButton, ToggleButtonGroup, Typography } from '@mui/ma
 import type { PerformanceRange, PortfolioDetail } from '@meridian/contracts';
 import { useFormatters } from '@meridian/react-sdk';
 import { ErrorState, FlashValue, SectionCard, StatTile, TrendText } from '@meridian/ui';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { usePerformance } from '../../api';
 import { AllocationBars, PerformanceChart, RangeToggle } from '../../components/charts';
 import type { LiveValuation } from './useLiveHoldings';
@@ -27,6 +27,11 @@ export function OverviewTab({
   const dayPercent = (live.dayPnl / (live.nav - live.dayPnl)) * 100;
   const activeReturn = portfolio.ytdReturnPercent - portfolio.benchmarkYtdReturnPercent;
   const top = [...live.rows].sort((a, b) => b.liveValue - a.liveValue).slice(0, TOP_POSITIONS);
+  // Memoised so `AllocationBars` (a memo component) keeps the same input across quote ticks.
+  const exposures = useMemo(
+    () => portfolio.exposures[dimension].slice(0, TOP_EXPOSURES),
+    [portfolio.exposures, dimension],
+  );
   return (
     <Stack spacing={2}>
       <Box
@@ -92,12 +97,13 @@ export function OverviewTab({
             </ToggleButtonGroup>
           }
         >
-          <AllocationBars exposures={portfolio.exposures[dimension].slice(0, TOP_EXPOSURES)} />
+          <AllocationBars exposures={exposures} />
         </SectionCard>
       </Box>
       <SectionCard title="Largest positions" subtitle="Live valuation" flush>
         <Box
           component="table"
+          aria-label="Largest positions"
           sx={{
             width: '100%',
             borderCollapse: 'collapse',
@@ -114,11 +120,19 @@ export function OverviewTab({
         >
           <thead>
             <tr>
-              <th>Security</th>
-              <th className="num">Price</th>
-              <th className="num">Today</th>
-              <th className="num">Value</th>
-              <th className="num">Weight</th>
+              <th scope="col">Security</th>
+              <th scope="col" className="num">
+                Price
+              </th>
+              <th scope="col" className="num">
+                Today
+              </th>
+              <th scope="col" className="num">
+                Value
+              </th>
+              <th scope="col" className="num">
+                Weight
+              </th>
             </tr>
           </thead>
           <tbody>

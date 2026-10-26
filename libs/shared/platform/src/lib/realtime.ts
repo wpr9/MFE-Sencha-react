@@ -67,7 +67,8 @@ export function createRealtimeConnection(options: RealtimeOptions): RealtimeConn
   const handleMessage = (message: MessageEvent<string>) => {
     if (message.lastEventId) lastEventId = message.lastEventId;
     try {
-      const parsed = StreamEventSchema.parse({ type: message.type, ...JSON.parse(message.data) });
+      // The SSE event name is authoritative: a body must not relabel itself (`session.ended`).
+      const parsed = StreamEventSchema.parse({ ...JSON.parse(message.data), type: message.type });
       onEvent(parsed);
     } catch (error) {
       onInvalidEvent?.(error, message.data);
@@ -135,6 +136,7 @@ export function createRealtimeConnection(options: RealtimeOptions): RealtimeConn
       clearTimeout(retryTimer);
       source?.close();
       source = null;
+      setStatus('offline'); // no stream, no live data: indicators must not keep saying "Live"
       if (typeof window !== 'undefined') {
         window.removeEventListener('online', handleOnline);
         window.removeEventListener('offline', handleOffline);

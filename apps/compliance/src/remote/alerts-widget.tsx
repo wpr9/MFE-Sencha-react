@@ -1,6 +1,6 @@
 import FactCheckOutlined from '@mui/icons-material/FactCheckOutlined';
 import { Box, ButtonBase, Stack, Typography } from '@mui/material';
-import { defineReactRemote, useFormatters, useIntent } from '@meridian/react-sdk';
+import { defineReactRemote, useFormatters, useIntent, useNow } from '@meridian/react-sdk';
 import { EmptyState, ErrorState, ListSkeleton, StatusChip } from '@meridian/ui';
 import { useAlerts, useLiveCompliance } from '../api';
 
@@ -12,6 +12,7 @@ function AlertsWidget() {
   useLiveCompliance();
   const alerts = useAlerts();
   const f = useFormatters();
+  const now = useNow();
   const intent = useIntent();
   if (alerts.isError)
     return (
@@ -77,7 +78,7 @@ function AlertsWidget() {
               {alert.ruleName}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {alert.raisedBy.name} &middot; {f.relative(alert.raisedAt)}
+              {alert.raisedBy.name} &middot; {f.relative(alert.raisedAt, now)}
             </Typography>
           </ButtonBase>
         ))}

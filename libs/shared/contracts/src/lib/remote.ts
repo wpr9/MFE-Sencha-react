@@ -52,7 +52,9 @@ export function isRemoteModule(value: unknown): value is RemoteModule {
 
 /**
  * Minimal caret-range check (`^MAJOR.MINOR.PATCH`) for contract negotiation,
- * so the browser bundle does not need a full semver implementation.
+ * so the browser bundle does not need a full semver implementation. Unlike
+ * semver it treats `^0.x` like any other major (the contract started at 1.0.0,
+ * so no 0.x range is ever published).
  */
 export function satisfiesContract(range: string, version: string = HOST_CONTRACT_VERSION): boolean {
   const parse = (value: string) =>

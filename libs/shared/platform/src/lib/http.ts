@@ -63,6 +63,11 @@ function buildUrl(
   path: string,
   query?: Readonly<Record<string, QueryValue>>,
 ): string {
+  // Paths are API routes, not URLs: query strings go through `query`, and no segment may
+  // leave the API prefix (`/api/../auth/...` would carry the CSRF token to another route).
+  if (/[?#]/.test(path) || path.split('/').includes('..')) {
+    throw new Error(`Invalid API path "${path}"`);
+  }
   const url = `${baseUrl.replace(/\/$/, '')}${path.startsWith('/') ? path : `/${path}`}`;
   if (!query) return url;
   const params = new URLSearchParams();
@@ -124,11 +129,12 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
     requestOptions: HttpRequestOptions<T> = {},
   ): Promise<T> {
     const trace = createTraceContext();
+    // Platform headers win over the caller's: attribution and tracing are not negotiable.
     const headers: Record<string, string> = {
+      ...requestOptions.headers,
       accept: 'application/json',
       traceparent: trace.traceparent,
       'x-meridian-client': clientName,
-      ...requestOptions.headers,
     };
     if (body !== undefined) headers['content-type'] = 'application/json';
     if (!isSafeMethod(method)) {
@@ -175,9 +181,18 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
       throw new HttpError(response.status, problem, problem.traceId ?? trace.traceId);
     }
 
-    if (response.status === 204 || response.headers.get('content-length') === '0')
-      return undefined as T;
-    const data: unknown = await response.json();
+    if (response.status === 204) return undefined as T;
+    const text = await response.text();
+    if (text.length === 0) return undefined as T;
+    let data: unknown;
+    try {
+      data = JSON.parse(text);
+    } catch (error) {
+      // A proxy or captive portal answering 200 with HTML is a contract failure,
+      // not a raw SyntaxError for the user to read.
+      telemetry?.error(error, { kind: 'contract', method, path });
+      throw new ContractError(path, error);
+    }
     if (!requestOptions.parser) return data as T;
     try {
       return requestOptions.parser.parse(data);

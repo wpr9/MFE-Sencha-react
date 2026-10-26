@@ -18,8 +18,9 @@ on a real identity provider.
   tokens, Origin allow-list, Fetch Metadata isolation, RBAC + entitlement
   checks on routes and on pushed events.
 - The SPA only calls `/auth/session`, `/auth/login`, `/auth/logout` and
-  `/auth/session/keep-alive`, so replacing the mock with OIDC (authorisation
-  code + PKCE, confidential client, e.g. `openid-client`) is a BFF-only change.
+  `/auth/session/keep-alive` (plus `/auth/session/simulate-expiry`, which exists
+  in mock mode only), so replacing the mock with OIDC (authorisation code +
+  PKCE, confidential client, e.g. `openid-client`) is a BFF-only change.
 
 ## Consequences
 

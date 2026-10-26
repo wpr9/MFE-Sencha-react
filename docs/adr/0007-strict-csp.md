@@ -15,9 +15,9 @@ is a _strict_ CSP ([web.dev/strict-csp](https://web.dev/articles/strict-csp)).
 ## Decision
 
 - `script-src 'nonce-{random}' 'strict-dynamic' 'unsafe-eval' https: 'unsafe-inline'`,
-  plus `object-src 'none'`, `base-uri 'none'`, `frame-ancestors 'none'` and
-  `form-action 'self'`. Styles, fonts, images and `connect-src` keep the remote
-  origins.
+  plus `default-src 'self'`, `object-src 'none'`, `base-uri 'none'`,
+  `frame-ancestors 'none'` and `form-action 'self'`. Styles, fonts, images and
+  `connect-src` keep the remote origins.
 - **Only the shell's own entry scripts carry the nonce.** `'strict-dynamic'`
   extends that trust to scripts they create: the Module Federation runtime
   injects remote entries and chunks, and the blotter injects Ext JS. A remote

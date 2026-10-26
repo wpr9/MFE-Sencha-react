@@ -35,7 +35,7 @@ Ext.define('Blotter.view.blotter.OrderDetail', {
         '</div>',
         '<dl class="mrd-kv">',
         '  <dt>Order ID</dt><dd class="mrd-mono">{id:htmlEncode}</dd>',
-        '  <dt>Type</dt><dd>{[values.orderType === "LIMIT" ? "Limit " + this.f.price(values.limitPrice) : "Market"]} &middot; {timeInForce}</dd>',
+        '  <dt>Type</dt><dd>{[values.orderType === "LIMIT" ? "Limit " + this.f.price(values.limitPrice) : "Market"]} &middot; {timeInForce:htmlEncode}</dd>',
         '  <dt>Avg fill price</dt><dd class="mrd-num">{[this.f.price(values.averageFillPrice)]}</dd>',
         '  <dt>Est. notional</dt><dd class="mrd-num">{[this.f.money(values.estimatedNotional)]}</dd>',
         '  <dt>Created</dt><dd>{[this.f.dateTime(values.createdAt)]}<br><span class="mrd-subtle">by {createdBy.name:htmlEncode}</span></dd>',
@@ -47,7 +47,7 @@ Ext.define('Blotter.view.blotter.OrderDetail', {
         '<div class="mrd-detail__compliance">{[this.f.complianceBadge(values.compliance.outcome, true)]}</div>',
         '<ul class="mrd-rules">',
         '  <tpl for="compliance.results">',
-        '    <li class="mrd-rule mrd-rule--{[values.severity.toLowerCase()]}">{[this.ruleIcon(values.severity)]}<div><strong>{ruleName:htmlEncode}</strong><span>{message:htmlEncode}</span></div></li>',
+        '    <li class="mrd-rule mrd-rule--{[this.ruleTone(values.severity)]}">{[this.ruleIcon(values.severity)]}<div><strong>{ruleName:htmlEncode}</strong><span>{message:htmlEncode}</span></div></li>',
         '  </tpl>',
         '</ul>',
         '<h3 class="mrd-detail__section">Executions <span class="mrd-group__count">{fills.length}</span></h3>',
@@ -66,6 +66,10 @@ Ext.define('Blotter.view.blotter.OrderDetail', {
             return this.f.icon(
               severity === 'PASS' ? 'pass' : severity === 'WARN' ? 'warning' : 'error',
             );
+          },
+          /** Allow-listed class suffix: a severity never lands in a class attribute raw. */
+          ruleTone: function (severity) {
+            return severity === 'PASS' ? 'pass' : severity === 'WARN' ? 'warn' : 'fail';
           },
         },
       ),
@@ -92,7 +96,7 @@ Ext.define('Blotter.view.blotter.OrderDetail', {
           text: 'Reject',
           cls: 'mrd-btn-outlined',
           hidden: true,
-          bind: { hidden: '{!actions.approve}' },
+          bind: { hidden: '{!actions.reject}' },
           handler: 'onRejectSelected',
         },
         {

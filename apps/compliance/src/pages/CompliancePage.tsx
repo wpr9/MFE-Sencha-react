@@ -30,7 +30,7 @@ import {
   type ComplianceRule,
   type RuleUtilization,
 } from '@meridian/contracts';
-import { useFormatters, useHost, useIntent, usePermission } from '@meridian/react-sdk';
+import { useFormatters, useHost, useIntent, useNow, usePermission } from '@meridian/react-sdk';
 import {
   EmptyState,
   ErrorState,
@@ -123,6 +123,7 @@ function AlertCard({
   readonly onResolve: (alert: ComplianceAlert, decision: Decision) => void;
 }) {
   const f = useFormatters();
+  const now = useNow();
   const intent = useIntent();
   const { scheme } = useTheme().meridian;
   const host = useHost();
@@ -136,6 +137,8 @@ function AlertCard({
   return (
     <Card
       id={`alert-${alert.id}`}
+      // Focus target after the resolve dialog closes: its opener button unmounts with the decision.
+      tabIndex={-1}
       sx={{
         p: 2.5,
         borderColor: focused ? scheme.primary : undefined,
@@ -167,7 +170,7 @@ function AlertCard({
             )}
             <Chip size="small" label={alert.id} sx={{ fontFamily: 'var(--mrd-font-mono)' }} />
             <Typography variant="body2" color="text.secondary">
-              Raised {f.relative(alert.raisedAt)} by {alert.raisedBy.name}
+              Raised {f.relative(alert.raisedAt, now)} by {alert.raisedBy.name}
             </Typography>
           </Stack>
           <Typography variant="h5">
@@ -252,12 +255,14 @@ function Approvals({ focusId }: { readonly focusId: string | null }) {
           label={`Open (${(alerts.data ?? []).filter((a) => a.status === 'OPEN').length})`}
           color={filter === 'open' ? 'primary' : 'default'}
           variant={filter === 'open' ? 'filled' : 'outlined'}
+          aria-pressed={filter === 'open'}
           onClick={() => setFilter('open')}
         />
         <Chip
           label={`All (${alerts.data?.length ?? 0})`}
           color={filter === 'all' ? 'primary' : 'default'}
           variant={filter === 'all' ? 'filled' : 'outlined'}
+          aria-pressed={filter === 'all'}
           onClick={() => setFilter('all')}
         />
       </Stack>
@@ -280,7 +285,16 @@ function Approvals({ focusId }: { readonly focusId: string | null }) {
         key={resolving?.alert.id ?? 'none'}
         alert={resolving?.alert ?? null}
         decision={resolving?.decision ?? 'APPROVE'}
-        onClose={() => setResolving(null)}
+        onClose={() => {
+          const resolved = resolving?.alert.id;
+          setResolving(null);
+          // MUI restores focus to the opener, but Approve/Reject unmount once the alert is
+          // resolved: then move focus to the card instead of letting it fall to <body>.
+          requestAnimationFrame(() => {
+            if (resolved && (!document.activeElement || document.activeElement === document.body))
+              document.getElementById(`alert-${resolved}`)?.focus();
+          });
+        }}
       />
     </Stack>
   );
@@ -305,9 +319,13 @@ function Utilization() {
     [rules.data],
   );
   const byPortfolio = useMemo(() => {
-    const groups = new Map<string, RuleUtilization[]>();
-    for (const row of utilization.data ?? [])
-      groups.set(row.portfolioName, [...(groups.get(row.portfolioName) ?? []), row]);
+    // Grouped by id (two portfolios may share a display name), shown by name.
+    const groups = new Map<string, { name: string; rows: RuleUtilization[] }>();
+    for (const row of utilization.data ?? []) {
+      const group = groups.get(row.portfolioId) ?? { name: row.portfolioName, rows: [] };
+      group.rows.push(row);
+      groups.set(row.portfolioId, group);
+    }
     return [...groups.entries()];
   }, [utilization.data]);
   if (utilization.isError)
@@ -325,8 +343,8 @@ function Utilization() {
         gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', xl: 'repeat(3, minmax(0, 1fr))' },
       }}
     >
-      {byPortfolio.map(([portfolio, rows]) => (
-        <SectionCard key={portfolio} title={portfolio} subtitle="Limit utilisation (live)">
+      {byPortfolio.map(([portfolioId, { name, rows }]) => (
+        <SectionCard key={portfolioId} title={name} subtitle="Limit utilisation (live)">
           <Stack spacing={2.5}>
             {rows.map((row) => (
               <Box key={row.ruleId}>

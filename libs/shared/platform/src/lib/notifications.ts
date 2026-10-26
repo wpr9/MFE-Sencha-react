@@ -53,7 +53,12 @@ export function createNotificationCenter(
       return Object.freeze({
         toast(toast) {
           const entry: Toast = { severity: 'info', ...toast, id: randomId(), source };
-          update({ ...snapshot, toasts: [...snapshot.toasts, entry].slice(-maxToasts) });
+          // Never evict the toast on screen (`toasts[0]`); a burst trims the queue behind it.
+          const [current, ...queue] = snapshot.toasts;
+          const toasts = current
+            ? [current, ...[...queue, entry].slice(-(maxToasts - 1))]
+            : [entry];
+          update({ ...snapshot, toasts });
         },
         publish(notification) {
           const item: InboxItem = {

@@ -95,21 +95,26 @@ export async function streamRoutes(app: FastifyInstance) {
         'x-accel-buffering': 'no',
         'x-trace-id': request.traceId,
       });
-      raw.write(`retry: ${CLIENT_RETRY_MS}\n\n`);
+      // A write after `end()` (a hub event in the same tick as a close) would raise an
+      // error event on the response; the guard makes every late write a no-op.
+      const send = (chunk: string) => {
+        if (!raw.writableEnded && !raw.destroyed) raw.write(chunk);
+      };
+      send(`retry: ${CLIENT_RETRY_MS}\n\n`);
 
       const write = (entry: HubEntry) => {
-        if (canReceive(session, entry.event)) raw.write(frame(entry));
+        if (canReceive(session, entry.event)) send(frame(entry));
       };
 
-      const lastEventId = Number(
-        request.headers['last-event-id'] ?? request.query.lastEventId ?? NaN,
-      );
-      if (Number.isFinite(lastEventId)) {
-        for (const entry of hub.replaySince(lastEventId)) write(entry);
+      // Resume point: a non-negative integer or nothing (`Number('')` would be 0 and
+      // replay the whole buffer).
+      const resumeFrom = request.headers['last-event-id'] ?? request.query.lastEventId;
+      if (typeof resumeFrom === 'string' && /^\d{1,15}$/.test(resumeFrom)) {
+        for (const entry of hub.replaySince(Number(resumeFrom))) write(entry);
       }
 
       const unsubscribe = hub.subscribe(write);
-      const heartbeat = setInterval(() => raw.write(': keep-alive\n\n'), HEARTBEAT_MS);
+      const heartbeat = setInterval(() => send(': keep-alive\n\n'), HEARTBEAT_MS);
       const stopOnSessionEnd = app.sessions.onEnded((sessionId, reason) => {
         if (sessionId !== session.id) return;
         const event: StreamEvent = { type: 'session.ended', reason };

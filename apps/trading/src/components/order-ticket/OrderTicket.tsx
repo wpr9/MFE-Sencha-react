@@ -52,6 +52,9 @@ export function OrderTicket({
   const { values } = ticket;
 
   const submit = handleSubmit(async (order) => {
+    // The button is disabled under the same conditions; re-checked here so no other submit
+    // path (Enter, a future shortcut) can bypass the compliance gate.
+    if (!ticket.ready || !ticket.checkIsCurrent || ticket.blocked || ticket.oversell) return;
     setSubmitError(null);
     try {
       const created = await createOrder.mutateAsync({

@@ -12,7 +12,7 @@ upstream bff {
 #  - 'unsafe-inline' styles: Emotion (MUI) and Ext JS write style tags/attributes.
 #  - `https: 'unsafe-inline'` in script-src are ignored by CSP3 browsers (legacy fallback).
 map $request_id $csp {
-  default "script-src 'nonce-$request_id' 'strict-dynamic' 'unsafe-eval' https: 'unsafe-inline'; object-src 'none'; base-uri 'none'; style-src 'self' ${REMOTE_ORIGINS} 'unsafe-inline'; font-src 'self' ${REMOTE_ORIGINS} data:; img-src 'self' ${REMOTE_ORIGINS} data:; connect-src 'self' ${REMOTE_ORIGINS}; frame-ancestors 'none'; form-action 'self'";
+  default "default-src 'self'; script-src 'nonce-$request_id' 'strict-dynamic' 'unsafe-eval' https: 'unsafe-inline'; object-src 'none'; base-uri 'none'; style-src 'self' ${REMOTE_ORIGINS} 'unsafe-inline'; font-src 'self' ${REMOTE_ORIGINS} data:; img-src 'self' ${REMOTE_ORIGINS} data:; connect-src 'self' ${REMOTE_ORIGINS}; frame-ancestors 'none'; form-action 'self'";
 }
 
 server {
@@ -28,11 +28,12 @@ server {
   # Container liveness probe (never proxied, never logged).
   location = /healthz {
     access_log off;
-    add_header Content-Type text/plain;
+    default_type text/plain;
     return 200 'ok';
   }
 
-  location /api/stream {
+  # `^~`: a plain prefix would lose to the regex location below and this block would be dead.
+  location ^~ /api/stream {
     proxy_pass http://bff;
     proxy_http_version 1.1;
     proxy_set_header Connection "";
@@ -45,6 +46,8 @@ server {
     proxy_read_timeout 1h;
   }
 
+  # Proxied responses carry the BFF's own security headers (helmet); the nginx snippet is
+  # for the static files it serves itself.
   location ~ ^/(api|auth)/ {
     proxy_pass http://bff;
     proxy_http_version 1.1;

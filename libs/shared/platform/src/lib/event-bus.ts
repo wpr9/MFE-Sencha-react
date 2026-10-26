@@ -7,6 +7,7 @@ import type {
   Unsubscribe,
 } from '@meridian/contracts';
 import { randomId } from './ids';
+import { deepFreeze } from './freeze';
 
 type AnyHandler = (payload: unknown, envelope: EventEnvelope) => void;
 
@@ -37,7 +38,8 @@ export interface EventBusController {
  * - Subscriber failures are isolated: one throwing remote cannot break others.
  * - The handler list is snapshotted per publish, so unsubscribing during
  *   dispatch is safe.
- * - Envelopes are frozen; payloads are treated as immutable by convention.
+ * - Envelopes and payloads are frozen (deeply): one subscriber cannot change what the
+ *   next one sees.
  */
 export function createEventBus(options: EventBusOptions = {}): EventBusController {
   const { onHandlerError, historySize = 200 } = options;
@@ -60,11 +62,12 @@ export function createEventBus(options: EventBusOptions = {}): EventBusControlle
     payload: MeridianEventMap[K],
     correlationId?: string,
   ) => {
+    const shared = deepFreeze(payload);
     // Built from a typed publish, so topic and payload are correlated by construction.
     const envelope = Object.freeze({
       id: randomId(),
       topic,
-      payload,
+      payload: shared,
       source,
       timestamp: Date.now(),
       ...(correlationId ? { correlationId } : {}),
@@ -74,7 +77,7 @@ export function createEventBus(options: EventBusOptions = {}): EventBusControlle
     if (recent.length > historySize) recent.splice(0, recent.length - historySize);
 
     for (const handler of [...(handlers.get(topic) ?? [])]) {
-      invoke(() => handler(payload, envelope), envelope);
+      invoke(() => handler(shared, envelope), envelope);
     }
     for (const handler of [...wildcard]) {
       invoke(() => handler(envelope), envelope);

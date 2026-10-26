@@ -1,6 +1,6 @@
 import {
+  IntentPayloadSchemas,
   Permission,
-  TradeTicketDraftSchema,
   type HostApi,
   type HostLocation,
   type InboxNotification,
@@ -16,6 +16,10 @@ type AppRouter = ReturnType<typeof createBrowserRouter>;
 
 const href = (location: HostLocation) => `${location.pathname}${location.search}${location.hash}`;
 
+/** Remotes navigate within the shell only: an app path, never a scheme, host or `//host`. */
+export const isInternalPath = (to: string): boolean =>
+  to.startsWith('/') && !to.startsWith('//') && !to.startsWith('/\\');
+
 /** Exposes the shell's data router to remotes through the framework-agnostic NavigationApi. */
 export function createRouterNavigation(router: AppRouter): NavigationApi {
   const current = (): HostLocation => {
@@ -24,7 +28,13 @@ export function createRouterNavigation(router: AppRouter): NavigationApi {
   };
   return {
     getLocation: current,
-    navigate: (to, options) => void router.navigate(to, { replace: options?.replace }),
+    navigate: (to, options) => {
+      if (!isInternalPath(to)) {
+        reportError(new Error(`Navigation to "${to}" refused: only shell paths are allowed`));
+        return;
+      }
+      void router.navigate(to, { replace: options?.replace });
+    },
     subscribe(listener) {
       let last = href(current());
       return router.subscribe(() => {
@@ -60,31 +70,40 @@ export function registerIntents(platform: Platform) {
       throw new IntentDeniedError(`You do not have permission to ${action}.`);
   };
 
+  const schemas = IntentPayloadSchemas;
+
   platform.intents.register('trade.ticket.open', (payload) => {
     require(Permission.OrderCreate, 'create orders');
-    const draft = TradeTicketDraftSchema.parse(payload);
+    const draft = schemas['trade.ticket.open'].parse(payload);
     if (draft.portfolioId && !auth.canAccessPortfolio(draft.portfolioId)) {
       throw new IntentDeniedError(`You are not entitled to trade portfolio ${draft.portfolioId}.`);
     }
     useShellUi.getState().openTicket(draft);
   });
-  platform.intents.register('order.open', ({ orderId }) => {
+  platform.intents.register('order.open', (payload) => {
     require(Permission.OrderRead, 'view orders');
+    const { orderId } = schemas['order.open'].parse(payload);
     navigate(`/orders?focus=${encodeURIComponent(orderId)}`);
   });
-  platform.intents.register('portfolio.open', ({ portfolioId, tab }) => {
+  platform.intents.register('portfolio.open', (payload) => {
     require(Permission.PortfolioRead, 'view portfolios');
+    const { portfolioId, tab } = schemas['portfolio.open'].parse(payload);
+    if (!auth.canAccessPortfolio(portfolioId)) {
+      throw new IntentDeniedError(`You are not entitled to portfolio ${portfolioId}.`);
+    }
     platform.state.setActivePortfolio(portfolioId);
     navigate(
       `/portfolios/${encodeURIComponent(portfolioId)}${tab && tab !== 'overview' ? `/${tab}` : ''}`,
     );
   });
-  platform.intents.register('compliance.alert.open', ({ alertId }) => {
+  platform.intents.register('compliance.alert.open', (payload) => {
     require(Permission.ComplianceRead, 'view compliance alerts');
+    const { alertId } = schemas['compliance.alert.open'].parse(payload);
     navigate(`/compliance?focus=${encodeURIComponent(alertId)}`);
   });
-  platform.intents.register('security.open', ({ symbol }) => {
+  platform.intents.register('security.open', (payload) => {
     require(Permission.MarketDataRead, 'view market data');
+    const { symbol } = schemas['security.open'].parse(payload);
     navigate(`/market?symbol=${encodeURIComponent(symbol)}`);
   });
 }

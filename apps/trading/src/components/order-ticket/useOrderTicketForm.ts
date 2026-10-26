@@ -36,11 +36,11 @@ export function useOrderTicketForm(draft: TradeTicketDraft) {
   const portfolios = usePortfolios();
   const securities = useSecurities();
 
-  const defaultPortfolio =
-    draft.portfolioId ??
-    (activePortfolioId && host.auth.canAccessPortfolio(activePortfolioId)
-      ? activePortfolioId
-      : undefined);
+  // Both candidates pass through the entitlement check: a deep link or another remote may
+  // name a portfolio this user cannot trade, and the ticket would dead-end on 403s.
+  const entitled = (id: string | null | undefined) =>
+    id && host.auth.canAccessPortfolio(id) ? id : undefined;
+  const defaultPortfolio = entitled(draft.portfolioId) ?? entitled(activePortfolioId);
   const form = useForm<TicketFormValues, unknown, OrderDraft>({
     // The resolver's input type is the schema's (numbers), the form's holds
     // nulls while fields are empty; the one cast documents that difference.
@@ -75,7 +75,10 @@ export function useOrderTicketForm(draft: TradeTicketDraft) {
   // A limit is suggested once per security from its live price, never re-imposed:
   // the trader may clear it, and a new security or a switch to MARKET discards it.
   // The price is read once (no subscription in the form), so ticks do not re-render it.
-  const prefilledFor = useRef<string | null>(null);
+  // An explicit limit in the draft counts as already suggested for its security.
+  const prefilledFor = useRef<string | null>(
+    draft.limitPrice != null ? (draft.symbol ?? null) : null,
+  );
   const { symbol, orderType } = values;
   useEffect(() => {
     if (orderType !== 'LIMIT' || !symbol || prefilledFor.current === symbol) return undefined;
@@ -99,7 +102,9 @@ export function useOrderTicketForm(draft: TradeTicketDraft) {
     setValue('limitPrice', null, { shouldValidate: true });
   };
 
-  const parsed = OrderDraftSchema.safeParse({ ...values, rationale: values.rationale || null });
+  // The justification does not change the compliance outcome: kept out of the key so
+  // typing it does not re-run the check (and grey out the panel) on every pause.
+  const parsed = OrderDraftSchema.safeParse({ ...values, rationale: null });
   const draftKey = parsed.success ? JSON.stringify(parsed.data) : null;
   const debouncedKey = useDebounced(draftKey, CHECK_DEBOUNCE_MS);
   const debouncedDraft = useMemo<OrderDraft | null>(

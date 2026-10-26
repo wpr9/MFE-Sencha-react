@@ -1,102 +1,86 @@
-# Status — management review prep (target: Monday 2026-10-26)
+# Status — management review prep (demo: Tuesday 2026-10-27)
 
 User decision: **Module Federation** (Piral considered and rejected). Goal: production-level review;
 show every required concept, explicitly including **data from shell → remotes** and **remote → remote**.
-Later asks (2026-10-25): deep **security + architecture overview** following Google's battle-tested
-practices ("secure and scalable"); **quality over quantity**; **no deployment anywhere**; afterwards a
-**small presentation: Nx Module Federation vs Piral for the Sencha migration** (arguments for a meeting).
+Later asks: deep **security + architecture overview** following Google's battle-tested practices;
+**quality over quantity**; **no deployment anywhere**; a **presentation: Nx Module Federation vs Piral**;
+two staff-level code reviews (2026-10-25 and 2026-10-26); the repo pushed to GitHub with a
+**zero-filler README** for engineers and CTOs; **no vendor-product mentions** anywhere in the repo.
 
-## Done before this task
+Repository: https://github.com/wpr9/MFE-Sencha-react (public). Deck: https://claude.ai/artifact/WAtSPrb6trMYjLQwnQz3o5
+(private artifact; ADR-0008 holds the decision record).
+
+## Done
 
 Workspace, contracts/platform/react-sdk/ui/tokens/formatting/dev-host libs, shell, 3 React remotes,
-Ext JS blotter, mock BFF, Docker/nginx topology, CI workflow, README + docs/architecture + 6 ADRs.
-Sign-in 403 (Origin null) fixed. Visual polish pass done via headless browser (light + dark).
+Ext JS blotter, mock BFF, Docker/nginx reference topology, CI workflow, README, docs/architecture,
+docs/security-architecture-review, 8 ADRs. Crash fix (strict-mode `callParent`), Trading desk
+communication demos, resilience drill, strict CSP, the 2026-10-25 security pass (44 findings) and
+code-quality pass (61 findings): all fixed and verified (see git history for the details).
 
-## Current task checklist
+## Staff-level review, 2026-10-26 (defensive programming, security, comments, architecture)
 
-1. [x] **Crash fix** — `this.callParent()` in strict-mode ES modules (Ext controllers' `destroy`),
-       guarded teardown in `RemoteOutlet`/`defineExtRemote`, page-level `errorElement`. Verified.
-2. [x] **Communication demos** — shell page **Trading desk** (`/desk`), verified in the browser:
-       Ext blotter widget (props `limit`/`interaction`, `hostpropschange`, publishes `order.focused`,
-       follows `security.focused` + workspace portfolio, server-side `symbol` filter), React
-       `trading/SecurityInsight` (follows both events, intraday chart from `GET /api/quotes/:symbol/intraday`,
-       Buy/Sell intents), `trading/MoversWidget` (`interaction: 'focus'` publishes `security.focused`),
-       shell **Message flow** panel.
-3. [ ] **Locale switch** in Settings → all remotes incl. Ext re-format live. (Optional; lower priority.)
-4. [x] **Resilience demo** — _Platform → Micro-frontends → Resilience drill_ (`setOutageSimulated` in
-       `apps/shell/src/app/remotes.ts`); verified: contained errors, rest works, recovery.
-5. [ ] ~~Concepts tour tab~~ — replaced by the security & architecture overview doc (quality > quantity).
-6. [x] **Review findings** (4 reviewers; each finding verified in code, most reproduced):
-   - BFF security (7): LIMIT-price compliance bypass (`domain/pricing.ts`), rate-limit key from
-     validated session (hashed), `TRUST_PROXY_HOPS`, `/healthz` exempt, `returnTo` URL-normalised,
-     zod query validation (422), SSE cap 5/session, compliance fields need-to-know (`null` without
-     `compliance:read`, UI hides them), mock-only route gated by `AUTH_MODE`. Re-exploited: all closed
-     (`scratchpad/verify_bff.py`).
-   - React remotes (12): order ticket (limit reset/prefill once, current-only compliance gating,
-     oversell, debounce loop, a11y), market deep-link scroll, alert scroll once, portfolio context only
-     after load, push-driven invalidation, full security master, date-only parsing (`parseDate`),
-     summary list a11y, four-eyes UI gating.
-   - Shell/platform (14): focus-trap fight (shell overlays `disableEnforceFocus`; reproduced + fixed),
-     remote route `errorElement` (`RemoteRouteError`), listener isolation (`listeners.ts`), stream stops
-     with session, absolute-limit dialog, clock skew (`serverTime`), first-activity keep-alive, one
-     Emotion cache per remote, registry per-entry validation, soft retry, a11y (tooltips, picker,
-     modifier clicks), POP→replace, global error/rejection → telemetry.
-   - Ext JS remote (11): record payload copies, Triton `:focus` reset removed (halves loaded directly),
-     deep-link scope/search split + `vm.notify()`, resumable loading, locale follows shell, proxy
-     cancels superseded reads + `then(ok, fail)`, actions upsert server answer, widget error state +
-     self-healing reload, prompt height. Deep link + focus ring verified in the browser.
-7. [x] **Strict CSP** (Google strict CSP: nonce + `'strict-dynamic'`), enforced in dev (`tools/mf/csp.ts`,
-       shell `security.nonce`) and prod (nginx `$request_id` nonce + `sub_filter`, HTML `no-store`, verified in
-       a local container). Only report: benign Ext feature probe (`detectPlatformTags` sets `on…=""`).
-8. [x] Docs: `docs/security-architecture-review.md` (Google practices, STRIDE, scalability, SLOs,
-       path to prod), ADR-0007 strict CSP, ADR-0002/0003 updated, architecture.md, README demo script,
-       CI supply chain (audit gate, `--ignore-scripts`, dependency review, CodeQL, provenance/SBOM),
-       Dependabot, CODEOWNERS.
-9. [x] Final verification (2026-10-25): typecheck 13/13, lint 0 errors, 41 tests, 6 prod builds,
-       5 personas light + dark in headless Chromium, BFF exploit re-runs, nginx `-t` + nonce runtime check.
-10. [x] **Presentation: Nx MF vs Piral** — 11-slide deck (private claude.ai artifact, owner must share it):
-        https://claude.ai/artifact/WAtSPrb6trMYjLQwnQz3o5 · decision record with sourced facts:
-        `docs/adr/0008-module-federation-over-piral.md`.
+Five adversarial reviewers (BFF, shell/platform/contracts, React remotes, Ext JS blotter,
+deploy/CI/docs) plus a manual pass over the trust boundaries. No P0. Every finding was verified
+against the code before it was fixed; the rest of this section is what changed.
 
-## Code-quality pass (2026-10-25, after the security pass)
-
-Staff-level review of the whole codebase for simplicity, efficiency, comments and Google
-engineering practices; four parallel reviewers (shell, React remotes, Ext JS blotter, BFF + deploy)
-plus a manual review of the shared libraries. Every finding verified in code before fixing.
-
-- **Deployment leaks closed:** the standalone dev host no longer ships in production remote bundles
-  (`tools/mf/define-remote.ts`, dev-only entry); BFF production default has no simulated latency;
-  SIGTERM drains SSE streams and exits in milliseconds (verified: 26 ms with a live stream);
-  `/healthz` exempt from rate limit and request logs; unprivileged nginx with health checks;
-  environment name comes from the runtime registry (`ENVIRONMENT`), not the build.
-- **Simplicity:** one module registry in the shell (`modules.ts`), `RemoteCard`, `useShellIntents`
-  (no `as never`), `describeError`/`isHttpError` in contracts (no structural casts in remotes),
-  `FlashValue`/`ListSkeleton`/`SecurityCell` in `@meridian/ui`, `HostViewController` base class and
-  one `actionsFor()` rule in the blotter, table-driven compliance rules reading limits from `RULES`,
-  portfolio definitions and the seed plan split out as data, order ticket and portfolio detail split
-  into focused files. Dead code removed (unused contract surface, `Can`, `SideTag`, `summary()`,
-  `statusLabel`, unused icons, CSS that never matched).
-- **Efficiency:** order form no longer re-renders per quote tick (estimate/quote panels own the
-  subscription); charts and allocation bars memoised; market filter split from the quote join; blotter
-  counts computed once per change; widget no longer double-renders per load; portfolio history
-  statistics computed once; SSE frames serialised once per event; permission set per session.
-- **Correctness found along the way:** `requirePermission` now fails closed; `requireSession`
-  problem text defined once; date-only values parsed as calendar dates; `formatRelativeTime`
-  localised; intent payloads validated at the shell boundary.
-- **Comments:** doc comments on every exported API; stale pointers fixed; WHY comments on the
-  non-obvious parts (focus traps, strict-mode Ext, CSP, double-render, fan-out).
-- **Verification:** typecheck/lint/test/build green for 13 projects (run with `NO_COLOR=1`; coloured
-  output had hidden errors from grep once), all personas in headless Chromium, BFF exploit re-runs,
-  nginx templates parsed in the unprivileged image, graceful-shutdown test.
-- **Deferred (documented, not done):** i18n plurals (needs the locale switch), SHA-pinning GitHub
-  actions (no network here; Dependabot keeps them fresh), `DOM` lib in the BFF tsconfig (needed by the
-  design-tokens barrel), `undici` override rationale unknown.
+- **BFF (P1):** order routes no longer act as an existence/portfolio oracle (`orderFor()` → 404
+  for non-entitled orders); `__Host-` cookies are cleared with their original attributes (sign-out
+  under TLS was silently leaving the dead cookie). Also: seeded history dropped from the SSE replay
+  buffer (`hub.reset()`), `Last-Event-ID` validated, SSE writes guarded after `end()`, open sells
+  reserve their unfilled quantity (no cash from shares that do not exist), `/compliance/check`
+  rejects unknown symbols (422) like `POST /orders`, prototype keys on the font route are 404,
+  telemetry attributes capped at 32 and errors logged as a bounded projection, `x-meridian-client`
+  clamped in logs, `TRUST_PROXY_HOPS` defaults to 0 (compose sets 1), performance `range` validated,
+  domain seed logs through pino, comments corrected (404-before-403, cancel wording, four-eyes).
+- **Platform/shell (P1):** the Host API is now frozen for real: session (deep), env, navigation,
+  flags, quotes, event payloads, the `'*'` quote batch per subscriber. `setActivePortfolio` and the
+  `portfolio.open` intent check entitlements; a persisted unentitled context is cleared at boot.
+  Platform HTTP headers win over caller headers; API paths may not contain `?`, `#` or `..`;
+  non-JSON 2xx bodies become `ContractError`. BroadcastChannel messages are schema-validated and a
+  renewal revives an `expired` tab. Telemetry clips every field to the schema bounds and batches by
+  bytes. Persisted preferences and flag overrides are validated. `randomId()` works outside secure
+  contexts (LAN demo over http). Also: every intent payload validated (`IntentPayloadSchemas`),
+  `navigate()` accepts shell paths only, registry entries must be http(s), SSE event name wins over
+  the body's `type`, stream `stop()` reports offline, intent observers isolated, toast queue never
+  evicts the toast on screen, flags follow session renewals, `default-src 'self'` in the CSP, store
+  listeners disposable, outage drill cannot be raced by an in-flight load.
+- **React remotes:** Sell prefill never sends `quantity: 0`; the ticket's submit handler re-checks
+  the compliance gate; intent-supplied portfolio ids go through `canAccessPortfolio`; explicit draft
+  limits are kept; the justification no longer re-runs the compliance check; NAV-zero and NaN
+  guards (`useLiveHoldings`, `TrendText`, `padDomain`); `AllocationBars` memo input stabilised;
+  live series bound matches the BFF history (360); utilisation grouped by portfolio id; relative
+  timestamps refresh (`useNow`); focus restored after resolving an alert; `aria-pressed` filters;
+  no minus icon on direction-less tiles; day-range marker clamped; detail polling stops on 403/404;
+  `useIntent` toasts use `describeError`.
+- **Ext JS blotter:** CSV export neutralises formula prefixes; every HTML sink encodes (unknown
+  status, side, `timeInForce`, severity class allow-listed); `actionsFor` mirrors the BFF exactly
+  (four-eyes on approve, separate reject); widget store `autoDestroy`; prop changes that clear the
+  focus reload; `limit` ≥ 1; `groupLabel` strips ranks only for the status grouping; `HostProxy` is
+  read-only; clipboard guarded outside secure contexts; ids encoded in `Ext.Msg`; justification
+  capped at 500; no dangling menu separator; `TERMINAL` from contracts; no double flash on the
+  stream echo; README documents the Triton pin and the lock file's real scope.
+- **Deploy/CI/docs:** CI `actions: read` for Nx affected on main; CodeQL ignores vendored Ext JS
+  and `dist`; nginx `^~ /api/stream` (was shadowed by the regex location), `default_type` for
+  `/healthz`, snippet comment corrected; shell image creates `html/config` for the entrypoint;
+  `.dockerignore` excludes `.env*`, docs and CI; `.nvmrc` 22.12 (team machines); docs corrected
+  (`usePermission`, header attribution, attestation wording, ADR-0004 endpoints, blotter README).
+- **Verification:** typecheck/lint/test/build green (39 tasks, 41 tests); headless Chromium for all
+  five personas (light + dark, real navigation, desk flows, deep link, resilience drill, 404 page):
+  no errors beyond the documented Ext CSP probe; BFF probes for every fixed behaviour
+  (`scratchpad/verify_bff2.py`) and the earlier exploit re-runs all pass; nginx templates parse in
+  the unprivileged image.
+- **Deferred (documented):** i18n plurals; SHA-pinning actions/images (Dependabot keeps them fresh);
+  bounded in-memory order/alert maps (mock only); `rsbuild preview` serves the nonce placeholder
+  unreplaced (no CSP header there, so harmless); Trusted Types blocked by Ext JS.
 
 ## How to verify
 
-Headless driver (session scratchpad; an agent deleted the first copy, now in `driver/`):
+Headless driver and BFF probes are session tools outside the repo (ephemeral):
 `/private/tmp/claude-501/-Users-wiaczeslaw-Documents-Code-MF-React-with-Sencha/3eb5708c-1c20-461a-a130-730587c1e0a8/scratchpad/driver/drive.mjs`
-— `node drive.mjs "<Persona>" step1,step2` (steps: navclicks, home, orders, portfolios, ticket,
-ticketkeys, market, compliance, platform, palette, desk, notfound; `THEME=dark`). Prints CSP violations.
-Screenshots in `scratchpad/shots/`. BFF exploit checks: `python3 -I scratchpad/verify_bff.py`.
-Stack: `npx nx run shell:serve` (BFF restarted separately with `npx tsx watch … apps/bff/src/main.ts`).
+(`node drive.mjs "<Persona>" step1,step2`; steps: navclicks, home, orders, portfolios, ticket,
+ticketkeys, market, compliance, platform, palette, desk, notfound, deeplink, focusring, resilience;
+`THEME=dark`; prints CSP violations and console problems; screenshots in `scratchpad/shots/`),
+`python3 -I scratchpad/verify_bff.py` (exploit re-runs; steps 6-7 need a fresh login-rate window)
+and `python3 -I scratchpad/verify_bff2.py` (this review's fixes). Stack: `npm start`. Checks:
+`NO_COLOR=1 FORCE_COLOR=0 NX_DAEMON=false npx nx run-many -t typecheck lint test build`.

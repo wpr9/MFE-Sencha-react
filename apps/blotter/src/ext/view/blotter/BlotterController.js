@@ -1,8 +1,13 @@
 import { Permission, apiPaths } from '@meridian/contracts';
 import { TERMINAL } from '../../util/Format.js';
 
-/** Compliance justifications shorter than this are rejected before they reach the server. */
+/** Justification bounds, mirroring the BFF's `OrderActionSchema`: checked before the round trip. */
 var MIN_JUSTIFICATION_CHARS = 3;
+var MAX_JUSTIFICATION_CHARS = 500;
+/** Ext.Msg titles and messages are HTML; ids are server data, encoded like everything else. */
+var encodeId = function (record) {
+  return Ext.String.htmlEncode(record.getId());
+};
 /** Columns of the CSV export, in order. */
 var EXPORT_COLUMNS = [
   'id',
@@ -20,7 +25,7 @@ var EXPORT_COLUMNS = [
   'estimatedNotional',
   'createdByName',
 ];
-var NO_ACTIONS = { approve: false, route: false, cancel: false };
+var NO_ACTIONS = { approve: false, reject: false, route: false, cancel: false };
 
 /**
  * Bridges the blotter view to the platform. Everything platform-facing goes
@@ -141,6 +146,7 @@ Ext.define('Blotter.view.blotter.BlotterController', {
     var store = vm.getStore('orders');
     if (!store || store.destroyed) return;
     var record = this.findRecord(order.id);
+    var changed = !record || record.get('status') !== order.status;
     if (record) {
       record.set(order, { dirty: false });
     } else {
@@ -150,7 +156,7 @@ Ext.define('Blotter.view.blotter.BlotterController', {
     }
     // A status change on the selected order changes what the detail toolbar may do.
     if (record === vm.get('selectedOrder')) vm.set('actions', this.actionsFor(record));
-    if (flash) this.flashRow(this.lookup('ordersGrid'), record);
+    if (flash && changed) this.flashRow(this.lookup('ordersGrid'), record);
   },
 
   matchesPortfolio: function (record) {
@@ -265,15 +271,19 @@ Ext.define('Blotter.view.blotter.BlotterController', {
   /**
    * Which actions the current user may take on `record`: the one place the
    * rule lives, for the row action, the context menu and the detail toolbar.
-   * UI gate only; the BFF re-checks every action.
+   * Mirrors the BFF, which re-checks every action: approval needs four eyes
+   * (never your own order), rejection does not, traders cancel any working
+   * order and portfolio managers only their own.
    */
   actionsFor: function (record) {
     var vm = this.getViewModel();
     var status = record.get('status');
     var terminal = TERMINAL.indexOf(status) !== -1;
     var own = (record.get('createdBy') || {}).id === vm.get('userId');
+    var pending = status === 'PENDING_APPROVAL';
     return {
-      approve: vm.get('canApprove') && status === 'PENDING_APPROVAL',
+      approve: vm.get('canApprove') && pending && !own,
+      reject: vm.get('canApprove') && pending,
       route: vm.get('canRoute') && status === 'NEW',
       cancel: vm.get('canCancel') && !terminal && (vm.get('canCancelAny') || own),
     };
@@ -365,7 +375,11 @@ Ext.define('Blotter.view.blotter.BlotterController', {
             me.tradeSimilar(record);
           },
         },
-        '-',
+        {
+          xtype: 'menuseparator',
+          // No dangling rule for read-only users: hidden with the actions it introduces.
+          hidden: !(actions.approve || actions.reject || actions.route || actions.cancel),
+        },
         {
           text: 'Approve',
           iconCls: 'mrd-icon mrd-icon-approve',
@@ -377,7 +391,7 @@ Ext.define('Blotter.view.blotter.BlotterController', {
         {
           text: 'Reject',
           iconCls: 'mrd-icon mrd-icon-reject',
-          hidden: !actions.approve,
+          hidden: !actions.reject,
           handler: function () {
             me.reject(record);
           },
@@ -451,7 +465,7 @@ Ext.define('Blotter.view.blotter.BlotterController', {
   approve: function (record) {
     var me = this;
     me.promptComment(
-      'Approve ' + record.getId(),
+      'Approve ' + encodeId(record),
       'Record the justification for the audit trail.',
       function (comment) {
         me.post(record, 'approve', { comment: comment }, 'Order ' + record.getId() + ' approved');
@@ -462,7 +476,7 @@ Ext.define('Blotter.view.blotter.BlotterController', {
   reject: function (record) {
     var me = this;
     me.promptComment(
-      'Reject ' + record.getId(),
+      'Reject ' + encodeId(record),
       'Explain why the order is rejected. The portfolio manager is notified.',
       function (comment) {
         me.post(record, 'reject', { comment: comment }, 'Order ' + record.getId() + ' rejected');
@@ -477,7 +491,7 @@ Ext.define('Blotter.view.blotter.BlotterController', {
   cancel: function (record) {
     var me = this;
     Ext.Msg.show({
-      title: 'Cancel ' + record.getId() + '?',
+      title: 'Cancel ' + encodeId(record) + '?',
       message:
         'Unfilled quantity (' +
         Blotter.util.Format.quantity(record.get('quantity') - record.get('filledQuantity')) +
@@ -507,6 +521,14 @@ Ext.define('Blotter.view.blotter.BlotterController', {
 
   copyId: function (record) {
     var host = this.host;
+    // `navigator.clipboard` is undefined outside secure contexts (plain http on a LAN address).
+    if (!navigator.clipboard) {
+      host.notifications.toast({
+        severity: 'error',
+        message: 'Clipboard needs a secure (https) page',
+      });
+      return;
+    }
     navigator.clipboard.writeText(record.getId()).then(
       function () {
         host.notifications.toast({ severity: 'info', message: 'Copied ' + record.getId() });
@@ -531,11 +553,16 @@ Ext.define('Blotter.view.blotter.BlotterController', {
       cls: 'mrd-ext mrd-dialog',
       fn: function (button, text) {
         if (button !== 'ok') return;
-        if (!text || text.trim().length < MIN_JUSTIFICATION_CHARS) {
+        var length = text ? text.trim().length : 0;
+        if (length < MIN_JUSTIFICATION_CHARS || length > MAX_JUSTIFICATION_CHARS) {
           host.notifications.toast({
             severity: 'warning',
             message:
-              'A justification of at least ' + MIN_JUSTIFICATION_CHARS + ' characters is required.',
+              'A justification of ' +
+              MIN_JUSTIFICATION_CHARS +
+              ' to ' +
+              MAX_JUSTIFICATION_CHARS +
+              ' characters is required.',
           });
           return;
         }
@@ -552,8 +579,9 @@ Ext.define('Blotter.view.blotter.BlotterController', {
     host.http
       .post(apiPaths.orderAction(record.getId(), action), body)
       .then(function (order) {
-        // Apply the server's answer now - even while the stream is reconnecting.
-        // Its later echo is a no-op: Model.set skips values that are already equal.
+        // Apply the server's answer now - even while the stream is reconnecting. Its later
+        // echo re-applies the same values (object fields compare by identity) without a
+        // second flash: `upsert` flashes only when the status actually changes.
         if (order && !view.destroyed) me.upsert(order, true);
         host.notifications.toast({ severity: 'success', message: successMessage });
         return order;

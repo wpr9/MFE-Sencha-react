@@ -17,6 +17,14 @@ import { round, type Random } from './random';
 import { getSecurity } from './securities';
 import { SEED_PLAN } from './seed-plan';
 
+/** The slice of a structured logger the domain needs (pino-compatible). */
+export interface DomainLogger {
+  warn(context: object, message: string): void;
+}
+const consoleLogger: DomainLogger = {
+  warn: (context, message) => console.warn(message, context),
+};
+
 const VENUES = ['NYSE', 'NASDAQ', 'ARCA', 'IEX', 'CBOE BZX', 'Liquidnet'];
 const TRADERS: readonly PersonRef[] = [{ id: 'u-jordan', name: 'Jordan Patel' }];
 const COMPLIANCE: PersonRef = { id: 'u-sam', name: 'Sam Rivera' };
@@ -45,6 +53,7 @@ export class OrderBook {
     private readonly compliance: ComplianceEngine,
     private readonly hub: EventHub,
     private readonly random: Random,
+    private readonly log: DomainLogger = consoleLogger,
   ) {}
 
   start(): void {
@@ -77,19 +86,29 @@ export class OrderBook {
         { path: 'symbol', message: 'Unknown security' },
       ]);
     if (!this.book.exists(draft.portfolioId)) throw notFound(`Portfolio ${draft.portfolioId}`);
-    if (
-      draft.side === 'SELL' &&
-      this.book.positionQuantity(draft.portfolioId, security.symbol) < draft.quantity
-    ) {
-      throw validation(
-        'Cannot sell more than the current position (short selling is not permitted).',
-        [
-          {
-            path: 'quantity',
-            message: `Position is ${this.book.positionQuantity(draft.portfolioId, security.symbol)} shares`,
-          },
-        ],
-      );
+    if (draft.side === 'SELL') {
+      const held = this.book.positionQuantity(draft.portfolioId, security.symbol);
+      // Open sells reserve their unfilled quantity: otherwise two full-position sells in
+      // flight both pass, and the second fill sells shares that are not there.
+      const reserved = this.list(
+        (order) =>
+          order.portfolioId === draft.portfolioId &&
+          order.symbol === security.symbol &&
+          order.side === 'SELL' &&
+          !TERMINAL_ORDER_STATUSES.includes(order.status),
+      ).reduce((sum, order) => sum + (order.quantity - order.filledQuantity), 0);
+      const available = held - reserved;
+      if (available < draft.quantity) {
+        throw validation(
+          'Cannot sell more than the available position (short selling is not permitted).',
+          [
+            {
+              path: 'quantity',
+              message: `Available to sell: ${available} shares (position ${held}, ${reserved} in open sell orders)`,
+            },
+          ],
+        );
+      }
     }
     const check = this.compliance.check(draft);
     if (check.outcome === 'FAIL') {
@@ -159,6 +178,7 @@ export class OrderBook {
 
   reject(id: string, by: PersonRef, comment: string): Order {
     const order = this.get(id);
+    // No four-eyes on rejection: declining your own order is the same as cancelling it.
     if (order.status !== 'PENDING_APPROVAL')
       throw conflict(`Order ${id} is ${order.status}, not pending approval.`);
     const updated = this.update(order, { status: 'REJECTED' });
@@ -186,7 +206,9 @@ export class OrderBook {
         id,
         'REJECTED',
         by,
-        'Order cancelled by originator.',
+        order.createdBy.id === by.id
+          ? 'Order cancelled by originator.'
+          : 'Order cancelled by the trading desk.',
       );
       if (alert) this.hub.publish({ type: 'alert.updated', alert });
     }
@@ -284,7 +306,10 @@ export class OrderBook {
         );
       } catch (error) {
         // A seed row that trips a hard rule is skipped, visibly, rather than aborting the seed.
-        console.warn(`seed: skipped ${item.side} ${item.symbol} for ${item.portfolioId}:`, error);
+        this.log.warn(
+          { side: item.side, symbol: item.symbol, portfolioId: item.portfolioId, err: error },
+          'seed: skipped an order that trips a hard rule',
+        );
         return;
       }
       const at = (minutes: number) => new Date(createdAt.getTime() + minutes * 60_000);

@@ -31,30 +31,42 @@ interface Focus {
   readonly via: string;
 }
 
-/** Intraday moves are small: scale to the day's range (with headroom), never to zero. */
+/**
+ * Intraday moves are small: scale to the day's range (with headroom), never to zero.
+ * Total: MUI X calls it for an empty series too (±Infinity), and a flat line at zero
+ * must still get a non-empty domain.
+ */
 const padDomain = (min: { valueOf(): number }, max: { valueOf(): number }) => {
   const low = Number(min);
   const high = Number(max);
-  const pad = (high - low) * 0.15 || high * 0.002;
+  if (!Number.isFinite(low) || !Number.isFinite(high)) return { min: 0, max: 1 };
+  const pad = (high - low) * 0.15 || Math.abs(high) * 0.002 || 1;
   return { min: low - pad, max: high + pad };
 };
 
-/** Live points kept per symbol: a few hours of one-second ticks is plenty for a sparkline. */
-const MAX_POINTS = 240;
+/** Live points kept per symbol: the BFF's intraday history is 360 one-second prints; keep as many. */
+const MAX_POINTS = 360;
 
 /** Shown beside the event source so the demo audience sees React <-> Ext JS traffic. */
-const TECHNOLOGY: Record<string, string> = {
-  blotter: 'Ext JS',
-  trading: 'React',
-  portfolio: 'React',
-  compliance: 'React',
-  shell: 'shell',
+const TECHNOLOGY: ReadonlyMap<string, string> = new Map([
+  ['blotter', 'Ext JS'],
+  ['trading', 'React'],
+  ['portfolio', 'React'],
+  ['compliance', 'React'],
+  ['shell', 'shell'],
+]);
+/** A Map, not an object: a source named like an Object method must not resolve to one. */
+const technologyLabel = (source: string) => {
+  const technology = TECHNOLOGY.get(source);
+  return technology ? ` (${technology})` : '';
 };
 
 function useIntraday(symbol: string | undefined) {
   const { http } = useHost();
   return useQuery({
     queryKey: ['intraday', symbol],
+    // `skipToken` (not `enabled: false`) keeps the key stable and the types honest while
+    // no security is focused.
     queryFn: symbol
       ? ({ signal }) =>
           http.get(apiPaths.intraday(symbol), { signal, parser: IntradaySeriesSchema })
@@ -187,7 +199,7 @@ export function SecurityInsight({ initialSymbol }: { readonly initialSymbol?: st
         </Typography>
         <Chip
           size="small"
-          label={`${focus.via} from ${focus.source}${TECHNOLOGY[focus.source] ? ` (${TECHNOLOGY[focus.source]})` : ''}`}
+          label={`${focus.via} from ${focus.source}${technologyLabel(focus.source)}`}
           sx={{
             bgcolor: scheme.primaryContainer,
             color: scheme.onPrimaryContainer,

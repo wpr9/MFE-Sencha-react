@@ -149,8 +149,8 @@ browser holds only an opaque, `HttpOnly`, `SameSite=Strict` session cookie
 - **Authorisation:** role → permission mapping lives server-side; the client
   only sees effective permissions. Every route checks permissions (RBAC) _and_
   portfolio entitlements (ABAC); pushed SSE events are filtered per user the
-  same way. The UI hides what you cannot do (`<Can>`, nav filtering, Ext
-  ViewModel flags) — purely as UX.
+  same way. The UI hides what you cannot do (`usePermission`, nav filtering,
+  Ext ViewModel flags) — purely as UX.
 
 ## Sencha Ext JS integration
 
@@ -218,8 +218,9 @@ published practices, scalability and the path to production, is in
   main documented cost of hosting the legacy module. Migrating it, or isolating
   it in a sandboxed iframe, are the long-term options.
 
-Also COOP, CORP, `X-Frame-Options`, `nosniff`, Permissions-Policy, and HSTS
-under TLS.
+Also `default-src 'self'` for every directive not listed. The static origins
+(nginx) add COOP, `X-Frame-Options`, `nosniff` and Permissions-Policy; BFF
+responses carry helmet's COOP, CORP and `nosniff`; HSTS under TLS on both.
 
 ## Alternatives considered
 

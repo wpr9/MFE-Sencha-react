@@ -5,12 +5,14 @@ MVVM) and federated into the React shell through the platform lifecycle
 contract. See [ADR-0003](../../docs/adr/0003-extjs-integration.md).
 
 ```
+src/index.ts           Dev-only entry: loads bootstrap.ts (standalone dev host); absent from prod bundles
 src/remote/            Integration layer (TypeScript) - federated
   app.ts               ./App                -> Blotter.view.blotter.Blotter
-  recent-orders-widget ./RecentOrdersWidget -> Blotter.view.widget.RecentOrders
+  recent-orders-widget.ts  ./RecentOrdersWidget -> Blotter.view.widget.RecentOrders
   mount-ext.ts         defineExtRemote(): lifecycle contract + ResizeObserver
   ext-runtime.ts       loads Ext once per page (scopeCss, theme, overrides)
 src/ext/               Ext JS classes (plain JS, Ext.define) - loaded after Ext
+  index.js             Class registry in dependency order (Ext.define is synchronous)
   util/Format.js       Cell renderers; numbers/dates via @meridian/formatting
   util/Csv.js          CSV export
   data/HostProxy.js    Ext proxy over host.http (CSRF, tracing, 401 handling)
@@ -36,13 +38,15 @@ run a commercially licensed build (7.x/8.x), three places change:
 
 1. **Files:** copy the runtime (`ext-all.js`, `classic/theme-triton/theme-triton.js`
    and `classic/theme-triton/resources/`) to `public/vendor/extjs/<version>/`,
-   mirroring the current layout. Delete the GPL folder and `NOTICE.md`.
+   mirroring the current layout. Delete the GPL folder (its `NOTICE.md` included).
 2. **Loader:** in `src/remote/ext-runtime.ts` set `EXT_VERSION` to `<version>`;
    if the theme is not Triton, also change the two theme CSS file names and the
-   theme JS path it loads.
+   theme JS path it loads. The Material skin (`src/styles/blotter.css`) is pinned
+   to Triton 6.2 class names (`x-grid-*`, `x-tip-*`, `x-form-trigger-*`): a newer
+   toolkit needs a visual pass over it.
 3. **Lock file:** regenerate `extjs.lock.json` with the new files' sha256 hashes
-   (the loader does not read it, but CI integrity checks do), or remove the
-   GPL entries from it.
+   (only `tools/scripts/vendor-extjs.mjs` reads it, while downloading; nothing at
+   runtime or in CI does), or remove the GPL entries from it.
 
 Licensing: 6.2.0 is GPL-3.0, with copyleft obligations; production use of
 Ext JS requires a commercial licence from Sencha. Note that Ext JS 6.x is out

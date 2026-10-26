@@ -7,6 +7,8 @@ on:
 
 permissions:
   contents: read
+  # nrwl/nx-set-shas looks up the last successful run on main through the Actions API.
+  actions: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -62,6 +64,8 @@ jobs:
         with:
           languages: javascript-typescript
           queries: security-extended
+          # Vendored Ext JS and build output are not ours to fix; scanning them is noise.
+          config-file: .github/codeql/codeql-config.yml
       - uses: github/codeql-action/analyze@v3
 
   images:
@@ -90,7 +94,8 @@ jobs:
           build-args: APP=${{ matrix.app }}
           push: false
           tags: meridian/${{ matrix.app || matrix.target }}:${{ github.sha }}
-          # SLSA build provenance and an SBOM attached to every image (published on push).
+          # SLSA build provenance and an SBOM are attached to every image when it is pushed.
+          # This POC builds without pushing (nothing is deployed), so none are emitted here.
           provenance: mode=max
           sbom: true
           cache-from: type=gha

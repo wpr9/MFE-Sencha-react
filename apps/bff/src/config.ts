@@ -48,11 +48,12 @@ const EnvSchema = z.object({
     .positive()
     .default(8 * 60 * 60),
   /**
-   * Reverse proxies in front of the BFF (the nginx ingress = 1). Only the
-   * X-Forwarded-For entries they append are trusted, so a client cannot spoof
-   * its address into logs or rate-limit keys. 0 = use the socket address.
+   * Reverse proxies in front of the BFF whose appended X-Forwarded-For entries
+   * are trusted (the nginx ingress = 1, set in docker-compose.yml). Default 0:
+   * with no proxy, trusting one hop would let a client choose its own address
+   * for logs and rate-limit buckets.
    */
-  TRUST_PROXY_HOPS: z.coerce.number().int().nonnegative().default(1),
+  TRUST_PROXY_HOPS: z.coerce.number().int().nonnegative().default(0),
   /**
    * Identity provider. Only the mock IdP exists in this POC; mock-only routes
    * (persona sign-in, simulated expiry) are registered in this mode alone.

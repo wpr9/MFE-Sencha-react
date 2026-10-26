@@ -1,3 +1,4 @@
+import { TERMINAL_ORDER_STATUSES } from '@meridian/contracts';
 import { formatCurrency, formatDateTime, formatPrice, formatQuantity } from '@meridian/formatting';
 
 /**
@@ -51,7 +52,8 @@ export const STATUS_META = {
   },
 };
 
-export const TERMINAL = ['FILLED', 'CANCELLED', 'REJECTED'];
+/** Terminal statuses, from the shared contract so the blotter cannot drift from the BFF. */
+export const TERMINAL = TERMINAL_ORDER_STATUSES;
 
 const COMPLIANCE_META = {
   PASS: { tone: 'success', icon: 'pass', label: 'All rules passed' },
@@ -59,10 +61,14 @@ const COMPLIANCE_META = {
   FAIL: { tone: 'error', icon: 'error', label: 'Hard breach' },
 };
 
-/** Strips the rank prefix from a `STATUS_META.group` key ("1 Needs approval" -> "Needs approval"). */
-export function groupLabel(value) {
+/**
+ * Strips the rank prefix from a `STATUS_META.group` key ("1 Needs approval" -> "Needs
+ * approval"). Only for the status grouping: a portfolio or security name that happens
+ * to start with a digit ("3 Arrows Fund") must come through untouched.
+ */
+export function groupLabel(value, groupField) {
   var text = String(value === null || value === undefined ? '' : value);
-  return /^\d /.test(text) ? text.substring(2) : text;
+  return groupField === 'statusGroup' && /^\d /.test(text) ? text.substring(2) : text;
 }
 
 /**
@@ -105,7 +111,8 @@ Ext.define('Blotter.util.Format', {
   },
 
   statusChip: function (status) {
-    var meta = STATUS_META[status] || { label: status, tone: 'neutral', icon: 'info' };
+    // Unknown statuses are shown verbatim, encoded: every HTML sink encodes, whatever the source.
+    var meta = STATUS_META[status] || { label: this.encode(status), tone: 'neutral', icon: 'info' };
     return (
       '<span class="mrd-chip mrd-chip--' +
       meta.tone +
@@ -117,13 +124,10 @@ Ext.define('Blotter.util.Format', {
   },
 
   sideTag: function (side) {
-    return (
-      '<span class="mrd-side mrd-side--' +
-      String(side).toLowerCase() +
-      '">' +
-      (side === 'BUY' ? 'Buy' : 'Sell') +
-      '</span>'
-    );
+    // Allow-listed into a class name; anything else is neither a buy nor a sell.
+    var tone = side === 'BUY' ? 'buy' : side === 'SELL' ? 'sell' : 'unknown';
+    var label = side === 'BUY' ? 'Buy' : side === 'SELL' ? 'Sell' : this.encode(side);
+    return '<span class="mrd-side mrd-side--' + tone + '">' + label + '</span>';
   },
 
   complianceBadge: function (outcome, withLabel) {

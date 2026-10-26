@@ -2,6 +2,15 @@ import type { AnyEventEnvelope, Unsubscribe } from '@meridian/contracts';
 import type { HostState, Platform } from '@meridian/platform';
 import { useSyncExternalStore } from 'react';
 
+/** Payloads come from remotes: a circular or BigInt value must not break the flow panel. */
+const safeJson = (value: unknown): string => {
+  try {
+    return JSON.stringify(value) ?? String(value);
+  } catch {
+    return '[unserialisable payload]';
+  }
+};
+
 /**
  * Records every message that crosses a micro-frontend boundary so the
  * workspace can *show* its integration model live:
@@ -102,7 +111,7 @@ export function startMessageFlow(platform: Platform, capacity = DEFAULT_CAPACITY
       from: dispatch.source,
       to: 'shell',
       label: dispatch.intent,
-      detail: `${JSON.stringify(dispatch.payload)} · ${dispatch.outcome}${dispatch.error ? `: ${dispatch.error}` : ''}`,
+      detail: `${safeJson(dispatch.payload)} · ${dispatch.outcome}${dispatch.error ? `: ${dispatch.error}` : ''}`,
     }),
   );
   platform.store.subscribe((state, previous) => {

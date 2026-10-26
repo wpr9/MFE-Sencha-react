@@ -8,6 +8,7 @@ import {
   formatRelativeTime,
   formatSignedPercent,
 } from '@meridian/formatting';
+import { describeError } from '@meridian/contracts';
 import type {
   ConnectionStatus,
   EventEnvelope,
@@ -137,6 +138,20 @@ export function useConnectionStatus(): ConnectionStatus {
   return useSyncExternalStore(subscribe, () => host.marketData.getStatus());
 }
 
+/**
+ * The current time, refreshed on an interval, for relative timestamps ("2 minutes
+ * ago") that must not go stale while nothing else re-renders. Pass it to
+ * `f.relative(value, now)`.
+ */
+export function useNow(intervalMs = 60_000): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(timer);
+  }, [intervalMs]);
+  return now;
+}
+
 /** Dispatches an intent and surfaces failures as a toast. */
 export function useIntent() {
   const host = useHost();
@@ -145,7 +160,7 @@ export function useIntent() {
       host.intents.dispatch(intent, payload).catch((error: unknown) => {
         host.notifications.toast({
           severity: 'error',
-          message: error instanceof Error ? error.message : String(error),
+          message: describeError(error),
         });
       });
     },
@@ -197,7 +212,9 @@ export function useFormatters() {
       /** `Oct 23`, for axis ticks. */
       shortDate: (value: string | number | Date | null | undefined) =>
         formatDateTime(value, { locale, style: 'shortDate' }),
-      relative: (value: string | number | Date) => formatRelativeTime(value, { locale }),
+      /** "2 minutes ago"; pass `now` from `useNow()` so the text refreshes. */
+      relative: (value: string | number | Date, now?: number) =>
+        formatRelativeTime(value, { locale, now }),
     }),
     [locale],
   );

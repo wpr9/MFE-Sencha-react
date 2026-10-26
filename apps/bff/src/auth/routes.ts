@@ -105,7 +105,9 @@ export async function authRoutes(app: FastifyInstance) {
       if (previous) sessions.end(previous.id, 'logout');
       const session = sessions.create(persona);
       request.log.info({ user: persona.user.id }, 'signed in (mock idp)');
-      reply.clearCookie(config.loginStateCookieName, { path: '/' });
+      // A `__Host-` cookie is only cleared by a Set-Cookie carrying the attributes it was
+      // set with (Secure, Path=/); without them browsers drop the clearing header itself.
+      reply.clearCookie(config.loginStateCookieName, cookieBase);
       reply.setCookie(config.sessionCookieName, session.id, { ...cookieBase, sameSite: 'strict' });
       return reply.redirect(sanitizeReturnTo(returnTo), 303);
     },
@@ -117,7 +119,7 @@ export async function authRoutes(app: FastifyInstance) {
       sessions.end(session.id, 'logout');
       request.log.info({ user: session.persona.user.id }, 'signed out');
     }
-    reply.clearCookie(config.sessionCookieName, { path: '/' });
+    reply.clearCookie(config.sessionCookieName, cookieBase); // same attributes as at sign-in
     return reply.code(204).send();
   });
 
@@ -139,7 +141,10 @@ export async function authRoutes(app: FastifyInstance) {
   }
 
   app.get<{ Params: { file: string } }>('/auth/assets/:file', async (request, reply) => {
-    const path = FONT_FILES[request.params.file];
+    // Own keys only: `constructor` or `__proto__` must be a 404, not a prototype lookup.
+    const path = Object.hasOwn(FONT_FILES, request.params.file)
+      ? FONT_FILES[request.params.file]
+      : undefined;
     if (!path) return reply.callNotFound();
     reply.header('cache-control', 'public, max-age=31536000, immutable').type('font/woff2');
     return reply.send(createReadStream(path));

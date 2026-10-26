@@ -17,7 +17,7 @@ Ext.define('Blotter.view.blotter.BlotterModel', {
     activePortfolioId: null,
     activePortfolioName: null,
     /** What the user may do with the selected order; see BlotterController.actionsFor. */
-    actions: { approve: false, route: false, cancel: false },
+    actions: { approve: false, reject: false, route: false, cancel: false },
     canCreate: false,
     canApprove: false,
     canRoute: false,
