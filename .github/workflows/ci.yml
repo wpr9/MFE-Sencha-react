@@ -34,7 +34,7 @@ jobs:
       - run: npm audit --omit=dev --audit-level=high
       # Formatting is a working agreement; CI makes it a check.
       - run: npx prettier --check .
-      - uses: nrwl/nx-set-shas@v4
+      - uses: nrwl/nx-set-shas@v5
       # Module-boundary rules run as part of lint: a remote importing shell
       # internals (or the Ext JS remote importing React libs) fails the build.
       - run: npx nx affected -t lint typecheck test build --parallel=3
