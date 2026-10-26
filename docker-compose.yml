@@ -1,0 +1,61 @@
+# Production-like topology on one machine: the shell (and same-origin BFF
+# gateway) on :8080 and every remote on its own origin, as on a real CDN.
+#   docker compose up --build   ->   http://localhost:8080
+name: meridian
+
+x-remote: &remote
+  build: &remote-build
+    context: .
+    dockerfile: deploy/docker/Dockerfile
+    target: remote
+  environment:
+    SHELL_ORIGIN: http://localhost:8080
+  restart: unless-stopped
+
+services:
+  bff:
+    build: { context: ., dockerfile: deploy/docker/Dockerfile, target: bff }
+    environment:
+      PUBLIC_ORIGINS: http://localhost:8080
+      COOKIE_SECURE: 'false' # 'true' behind TLS (switches to __Host- cookies)
+      LOG_LEVEL: info
+    restart: unless-stopped
+
+  shell:
+    build: { context: ., dockerfile: deploy/docker/Dockerfile, target: shell }
+    ports: ['8080:8080']
+    environment:
+      BFF_UPSTREAM: bff:3333
+      ENVIRONMENT: staging # one image for every environment; this file names it
+      REMOTE_ORIGINS: http://localhost:8081 http://localhost:8082 http://localhost:8083 http://localhost:8084
+      PORTFOLIO_URL: http://localhost:8081
+      TRADING_URL: http://localhost:8082
+      COMPLIANCE_URL: http://localhost:8083
+      BLOTTER_URL: http://localhost:8084
+    depends_on:
+      bff: { condition: service_healthy }
+      portfolio: { condition: service_started }
+      trading: { condition: service_started }
+      compliance: { condition: service_started }
+      blotter: { condition: service_started }
+    restart: unless-stopped
+
+  portfolio:
+    <<: *remote
+    build: { <<: *remote-build, args: { APP: portfolio } }
+    ports: ['8081:8080']
+
+  trading:
+    <<: *remote
+    build: { <<: *remote-build, args: { APP: trading } }
+    ports: ['8082:8080']
+
+  compliance:
+    <<: *remote
+    build: { <<: *remote-build, args: { APP: compliance } }
+    ports: ['8083:8080']
+
+  blotter:
+    <<: *remote
+    build: { <<: *remote-build, args: { APP: blotter } }
+    ports: ['8084:8080']

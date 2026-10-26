@@ -1,0 +1,7 @@
+/dist
+/coverage
+/.nx/cache
+/.nx/workspace-data
+apps/blotter/public/vendor
+apps/blotter/extjs.lock.json
+package-lock.json

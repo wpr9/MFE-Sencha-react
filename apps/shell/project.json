@@ -1,0 +1,35 @@
+{
+  "name": "shell",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/shell/src",
+  "projectType": "application",
+  "tags": ["scope:shell", "type:app", "framework:react"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "dependsOn": [
+        { "projects": ["bff", "portfolio", "trading", "compliance", "blotter"], "target": "serve" }
+      ],
+      "options": { "command": "rsbuild dev", "cwd": "apps/shell" }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": { "command": "rsbuild build", "cwd": "apps/shell" }
+    },
+    "preview": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "dependsOn": [
+        "build",
+        {
+          "projects": ["portfolio", "trading", "compliance", "blotter", "bff"],
+          "target": "preview"
+        }
+      ],
+      "options": { "command": "rsbuild preview", "cwd": "apps/shell" }
+    },
+    "typecheck": {}
+  }
+}

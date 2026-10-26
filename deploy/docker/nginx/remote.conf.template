@@ -1,0 +1,44 @@
+# A federated remote: static files, independently deployed, fetched cross-origin by the shell.
+server {
+  listen 8080;
+  server_name _;
+  root /usr/share/nginx/html;
+  server_tokens off;
+  gzip on;
+  gzip_vary on;
+  gzip_min_length 1024;
+  gzip_types text/css application/javascript application/json image/svg+xml;
+
+  # Container liveness probe.
+  location = /healthz {
+    access_log off;
+    add_header Content-Type text/plain;
+    return 200 'ok';
+  }
+
+  # Entry points must revalidate so a new deployment is picked up immediately.
+  location ~ ^/(mf-manifest\.json|remoteEntry\.js|mf-stats\.json)$ {
+    include /etc/nginx/snippets/security-headers.conf;
+    add_header Access-Control-Allow-Origin "${SHELL_ORIGIN}" always;
+    add_header Vary "Origin" always;
+    add_header Cache-Control "no-cache" always;
+  }
+
+  # Content-hashed chunks and versioned vendor files (e.g. vendor/extjs/6.2.0/): cache forever.
+  location ~ ^/(static|vendor)/ {
+    include /etc/nginx/snippets/security-headers.conf;
+    add_header Access-Control-Allow-Origin "${SHELL_ORIGIN}" always;
+    add_header Vary "Origin" always;
+    add_header Cache-Control "public, max-age=31536000, immutable" always;
+  }
+
+  # Everything else a remote ships (fonts, the Ext JS runtime). No index.html is built,
+  # so the origin root is a 404 by design.
+  location / {
+    include /etc/nginx/snippets/security-headers.conf;
+    add_header Access-Control-Allow-Origin "${SHELL_ORIGIN}" always;
+    add_header Vary "Origin" always;
+    add_header Cache-Control "no-cache" always;
+    try_files $uri =404;
+  }
+}

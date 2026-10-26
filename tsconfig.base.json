@@ -1,0 +1,33 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "useDefineForClassFields": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": [],
+    "paths": {
+      "@meridian/contracts": ["./libs/shared/contracts/src/index.ts"],
+      "@meridian/platform": ["./libs/shared/platform/src/index.ts"],
+      "@meridian/formatting": ["./libs/shared/formatting/src/index.ts"],
+      "@meridian/design-tokens": ["./libs/shared/design-tokens/src/index.ts"],
+      "@meridian/dev-host": ["./libs/shared/dev-host/src/index.ts"],
+      "@meridian/ui": ["./libs/shared/ui/src/index.ts"],
+      "@meridian/react-sdk": ["./libs/shared/react-sdk/src/index.ts"]
+    }
+  },
+  "exclude": ["node_modules", "tmp", "dist"]
+}

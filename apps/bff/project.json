@@ -1,0 +1,37 @@
+{
+  "name": "bff",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/bff/src",
+  "projectType": "application",
+  "tags": ["scope:bff", "type:server"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "options": {
+        "command": "tsx watch --clear-screen=false --tsconfig apps/bff/tsconfig.json apps/bff/src/main.ts"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "command": "esbuild apps/bff/src/main.ts --bundle --platform=node --target=node22 --format=cjs --sourcemap --tsconfig=apps/bff/tsconfig.json --external:pino-pretty --outfile=apps/bff/dist/main.cjs --log-level=warning && mkdir -p apps/bff/dist/assets && cp node_modules/@fontsource-variable/google-sans/files/google-sans-latin-wght-normal.woff2 apps/bff/dist/assets/google-sans.woff2 && cp node_modules/@fontsource-variable/roboto/files/roboto-latin-wght-normal.woff2 apps/bff/dist/assets/roboto.woff2"
+      }
+    },
+    "typecheck": {},
+    "preview": {
+      "executor": "nx:run-commands",
+      "continuous": true,
+      "dependsOn": ["build"],
+      "options": {
+        "command": "node --enable-source-maps apps/bff/dist/main.cjs",
+        "env": {
+          "NODE_ENV": "production",
+          "LOG_LEVEL": "info",
+          "COOKIE_SECURE": "false"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "react-sdk",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/shared/react-sdk/src",
+  "projectType": "library",
+  "tags": ["framework:react", "scope:shared", "type:sdk"],
+  "targets": {
+    "typecheck": {}
+  }
+}
