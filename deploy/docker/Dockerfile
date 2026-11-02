@@ -4,7 +4,7 @@
 # values (remote URLs, origins, upstreams) are injected at container start, so
 # the SAME image is promoted from dev to production ("build once, deploy anywhere").
 
-FROM node:22.13-alpine AS deps
+FROM node:26.13-alpine AS deps
 WORKDIR /workspace
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts --no-audit --no-fund
@@ -46,7 +46,7 @@ EXPOSE 8080
 
 # ------------------------------------------------------------------------ bff
 # Self-contained esbuild bundle: no node_modules in the runtime image.
-FROM node:22.13-alpine AS bff
+FROM node:26.13-alpine AS bff
 WORKDIR /app
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3333
 COPY --from=build /workspace/apps/bff/dist ./dist
